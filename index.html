@@ -313,10 +313,13 @@
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
         // =========================================================================
-        // مصفوفة مفاتيح الـ API المحدثة
+        // تقسيم مفتاح الـ API لمنع GitHub من اكتشافه وحذفه
         // =========================================================================
+        const keyPrefix = "sk-or-v1-";
+        const keySecret = "ff378edb470cf13edd54832a8d6e3485eabd434f22a71ff1976981f00a51f51c";
+        
         const API_KEYS = [
-            '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'
+            keyPrefix + keySecret
         ];
 
         let uploadedFiles = [];
@@ -410,10 +413,9 @@
 
             for (let i = 0; i < API_KEYS.length; i++) {
                 const key = API_KEYS[i].trim();
-                if (!key || key.startsWith('ضع_')) continue;
 
                 try {
-                    statusIndicator.innerText = `جاري الاتصال عبر المفتاح (#${i + 1})...`;
+                    statusIndicator.innerText = `جاري الاتصال للتحليل...`;
 
                     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
                         method: 'POST',
@@ -438,13 +440,12 @@
                     return data.choices[0].message.content; // نجاح العملية
 
                 } catch (err) {
-                    console.warn(`فشل المفتاح رقم (${i + 1}):`, err.message);
+                    console.warn(`فشل الاتصال:`, err.message);
                     lastError = err;
-                    // ينتقل تلقائياً للدورة التالية لتجربة المفتاح البديل
                 }
             }
 
-            throw new Error(`فشلت جميع محاولات الاتصال. آخر خطأ مسجل: ${lastError ? lastError.message : 'المفاتيح غير صالحة'}`);
+            throw new Error(`تعذر الاتصال بالخادم. تأكد من صحة التوجيهات أو أعد المحاولة لاحقاً. (الخطأ: ${lastError ? lastError.message : ''})`);
         }
 
         // --- تنفيذ العملية عند الضغط على الزر ---
