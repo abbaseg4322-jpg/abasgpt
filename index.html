@@ -53,6 +53,11 @@ dialog label{display:block;font-weight:700;margin:12px 0 4px}
 .brand{display:flex;align-items:center;gap:12px}
 #lockbox p{margin:0 0 8px}
 @media(prefers-reduced-motion:reduce){#splash{transition:none}}
+.out{white-space:normal}
+.out pre{direction:ltr;text-align:left;background:var(--field);border:1px solid var(--line);border-radius:10px;padding:12px;overflow-x:auto;white-space:pre;margin:8px 0;font:.88rem/1.6 ui-monospace,Menlo,Consolas,monospace}
+.out code{direction:ltr;unicode-bidi:embed;background:var(--field);padding:1px 6px;border-radius:6px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.9em}
+.out pre code{background:none;padding:0}
+@media(max-width:480px){.tabs button{font-size:.85rem;padding:8px 4px}}
 </style>
 </head>
 <body>
@@ -66,6 +71,7 @@ dialog label{display:block;font-weight:700;margin:12px 0 4px}
   <button class="on" data-t="p1">الملفات</button>
   <button data-t="p2">نص من صورة</button>
   <button data-t="p3">بحث</button>
+  <button data-t="p4">صور</button>
 </div>
 
 <section class="panel on" id="p1">
@@ -110,6 +116,16 @@ dialog label{display:block;font-weight:700;margin:12px 0 4px}
   <div id="src3" class="meta"></div>
   <div class="meta" id="m3"></div>
 </section>
+<section class="panel" id="p4">
+  <textarea id="iq" placeholder="صف الصورة التي تريدها" style="min-height:90px"></textarea>
+  <div class="row">
+    <select id="isize"><option value="1024x1024">مربعة</option><option value="768x1024">عمودية</option><option value="1024x768">أفقية</option></select>
+    <label style="display:flex;align-items:center;gap:6px;flex:1;min-width:170px"><input type="checkbox" id="itr" checked> ترجمة الوصف للإنجليزية (نتائج أدق)</label>
+  </div>
+  <div class="row"><button class="pri" id="go4">ولّد الصورة</button><button class="sec" id="dl4" hidden>تنزيل</button></div>
+  <img class="prev" id="iout" hidden alt="الصورة المولّدة" style="max-height:none">
+  <div class="meta" id="m4"></div>
+</section>
 <footer class="meta" style="text-align:center;margin:18px 0 6px">abf ai · تطوير الإعلامي عباس بركات فرحان</footer>
 </div>
 
@@ -142,7 +158,7 @@ dialog label{display:block;font-weight:700;margin:12px 0 4px}
 const GEMINI_KEY = ""; // اتركه فارغًا والصق مفتاحك من زر «المزوّدون»
 /* ========================== */
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 const $ = id => document.getElementById(id);
 const store = { get:k=>{try{return localStorage.getItem(k)||""}catch(e){return ""}}, set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}} };
 
@@ -165,6 +181,21 @@ $("unlock").onclick=tryUnlock;
 // عند الحفظ أو الإغلاق: تُعاد الصفحة فيعود القفل (بدون إعادة شاشة الترحيب)
 dlg.addEventListener("close",()=>{try{sessionStorage.setItem("noSplash","1")}catch(e){} location.reload()});
 $("pin").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();tryUnlock()}});
+// عرض منسّق: يحمي الكود البرمجي (اتجاه يسار، خط ثابت) ويهرّب HTML
+const esc=x=>x.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+function md(t){
+  const blocks=[];
+  t=t.replace(/```[^\n]*\n?([\s\S]*?)```/g,(_,c)=>{blocks.push(c.replace(/\n$/,""));return "\u0000"+(blocks.length-1)+"\u0000"});
+  t=esc(t).replace(/`([^`\n]+)`/g,"<code>$1</code>").replace(/\*\*([^*\n]+)\*\*/g,"<b>$1</b>")
+    .replace(/^#{1,6}\s*(.+)$/gm,"<b>$1</b>").replace(/^\s*[*-]\s+/gm,"• ").replace(/\n/g,"<br>");
+  t=t.replace(/\u0000(\d+)\u0000/g,(_,i)=>"<pre><code>"+esc(blocks[i])+"</code></pre>");
+  return t.replace(/<br>(<pre>)/g,"$1").replace(/(<\/pre>)<br>/g,"$1");
+}
+function setOut(el,text){el.dataset.raw=text;el.innerHTML=md(text)}
+async function copy(text,btn){
+  try{await navigator.clipboard.writeText(text)}catch(e){const t=document.createElement("textarea");t.value=text;document.body.appendChild(t);t.select();try{document.execCommand("copy")}catch(_){}t.remove()}
+  if(btn){const o=btn.textContent;btn.textContent="تم النسخ ✓";setTimeout(()=>btn.textContent=o,1200)}
+}
 // تبويبات
 document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>{
   document.querySelectorAll(".tabs button,.panel").forEach(x=>x.classList.remove("on"));
@@ -175,6 +206,7 @@ document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>{
 $("save").onclick=()=>["gem","or","groq","tav"].forEach(n=>store.set("k_"+n,$("k_"+n).value.trim()));
 
 // ====== الموجّه: تسلسل المزوّدين والمودلات ======
+let IMG_MODELS=["gemini-2.5-flash-image"];
 let GEM_MODELS=["gemini-3.8-flash","gemini-3.5-flash-lite"];
 (async()=>{ // يجلب المودلات المتاحة فعليًا لمفتاحك، ويبقي القائمة أعلاه احتياطًا
   const k=(store.get("k_gem")||GEMINI_KEY).trim(); if(!k) return;
@@ -184,6 +216,9 @@ let GEM_MODELS=["gemini-3.8-flash","gemini-3.5-flash-lite"];
     const found=(j.models||[]).filter(m=>(m.supportedGenerationMethods||[]).includes("generateContent")&&/flash/.test(m.name)&&!/image|tts|live|audio|embed|robotics|computer|omni|preview|latest|exp/.test(m.name))
       .map(m=>m.name.replace("models/","")).sort().reverse().slice(0,4);
     GEM_MODELS=[...new Set([...found,...GEM_MODELS])];
+    const imgs=(j.models||[]).filter(m=>(m.supportedGenerationMethods||[]).includes("generateContent")&&/image/.test(m.name))
+      .map(m=>m.name.replace("models/","")).sort().reverse().slice(0,3);
+    IMG_MODELS=[...new Set([...imgs,...IMG_MODELS])];
   }catch(e){}
 })();
 function providers(needVision){
@@ -194,14 +229,16 @@ function providers(needVision){
   if(gq&&!needVision) list.push({name:"Groq · llama-3.3-70b",vision:false,limit:24000,run:(p)=>openai("https://api.groq.com/openai/v1/chat/completions",gq,"llama-3.3-70b-versatile",p)});
   return list;
 }
-async function gemini(key,model,{text,images,search}){
-  key=key.trim();
-  const parts=[{text}]; (images||[]).forEach(i=>parts.push({inlineData:{mimeType:i.mime,data:i.data}}));
-  const base=`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
-  const body=JSON.stringify({contents:[{role:"user",parts}],...(search?{tools:[{google_search:{}}]}:{})});
-  let r=await fetch(base,{method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":key},body});
-  if(r.status===401) r=await fetch(base+"?key="+encodeURIComponent(key),{method:"POST",headers:{"Content-Type":"application/json"},body});
+async function gcall(key,model,body){
+  key=key.trim(); const base=`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, b=JSON.stringify(body);
+  let r=await fetch(base,{method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":key},body:b});
+  if(r.status===401) r=await fetch(base+"?key="+encodeURIComponent(key),{method:"POST",headers:{"Content-Type":"application/json"},body:b});
   const j=await r.json(); if(!r.ok) throw new Error(j.error?.message||r.status);
+  return j;
+}
+async function gemini(key,model,{text,images,search}){
+  const parts=[{text}]; (images||[]).forEach(i=>parts.push({inlineData:{mimeType:i.mime,data:i.data}}));
+  const j=await gcall(key,model,{contents:[{role:"user",parts}],...(search?{tools:[{google_search:{}}]}:{})});
   const t=j.candidates?.[0]?.content?.parts?.map(p=>p.text||"").join(""); if(!t) throw new Error("رد فارغ");
   const sources=(j.candidates[0].groundingMetadata?.groundingChunks||[]).map(c=>c.web).filter(Boolean);
   return {text:t,sources};
@@ -221,14 +258,17 @@ async function ask(payload){
       return {...r,by:p.name+(payload.search&&!p.name.startsWith("Gemini")?" (بدون بحث مباشر)":"")};
     }catch(e){errs.push(p.name+": "+e.message)}
   }
-  throw new Error(errs.length?errs.join("\n"):"لا يوجد مزوّد متاح");
+  throw new Error(errs.length?errs.join("\n"):"لا يوجد مفتاح. اضغط «المزوّدون» وأضف مفتاح Gemini");
 }
 
 // ====== قراءة الملفات ======
+const need=(ok,name)=>{if(!ok)throw new Error("تعذّر تحميل مكتبة "+name+"، تحقق من الاتصال بالإنترنت")};
 const b64=buf=>{let s="",b=new Uint8Array(buf);for(let i=0;i<b.length;i+=8192)s+=String.fromCharCode.apply(null,b.subarray(i,i+8192));return btoa(s)};
 const fileB64=f=>new Promise(r=>{const x=new FileReader();x.onload=()=>r(x.result.split(",")[1]);x.readAsDataURL(f)});
 async function readFile(f,prog){
   const n=f.name.toLowerCase(), buf=await f.arrayBuffer();
+  need(!n.endsWith(".pdf")||window.pdfjsLib,"PDF"); need(!n.endsWith(".docx")||window.mammoth,"Word");
+  need(!/\.(xlsx|xls|csv)$/.test(n)||window.XLSX,"Excel"); need(!n.endsWith(".pptx")||window.JSZip,"PowerPoint");
   if(f.type.startsWith("image/")) return {text:"",images:[{mime:f.type,data:b64(buf)}]};
   if(n.endsWith(".pdf")){
     const pdf=await pdfjsLib.getDocument({data:buf.slice(0)}).promise; let t="";
@@ -273,7 +313,7 @@ function drop(zone,input,cb){
 }
 drop($("drop"),$("f1"),f=>{file1=f;$("fname").textContent="📎 "+f.name});
 $("go1").onclick=async()=>{
-  const out=$("out1"),m=$("m1"),btn=$("go1"); out.className="out";out.textContent="";m.textContent="";
+  const out=$("out1"),m=$("m1"),btn=$("go1"); out.className="out";out.textContent="";out.dataset.raw="";m.textContent="";
   if(!file1) return out.innerHTML='<span class="err">اختر ملفًا أولًا</span>';
   btn.disabled=true;
   try{
@@ -287,11 +327,11 @@ $("go1").onclick=async()=>{
       ex:`استخرج النص كاملًا كما هو دون تغيير أو تلخيص.`}[k];
     out.textContent="جارٍ المعالجة…";
     const r=await ask({text:`${ins}\n${q?"تعليمات المستخدم: "+q+"\n":""}\n=== المحتوى ===\n${d.text}`,images:d.images});
-    out.textContent=r.text; m.textContent="تمت المعالجة بواسطة: "+r.by;
+    setOut(out,r.text); m.textContent="تمت المعالجة بواسطة: "+r.by;
   }catch(e){out.className="out err";out.textContent=e.message}
   btn.disabled=false;
 };
-$("cp1").onclick=()=>navigator.clipboard.writeText($("out1").textContent);
+$("cp1").onclick=()=>copy($("out1").dataset.raw||$("out1").textContent,$("cp1"));
 
 // ====== الصفحة الثانية: خط اليد ======
 let file2=null;
@@ -307,7 +347,7 @@ $("go2").onclick=async()=>{
   }catch(e){$("out2").value="";m.innerHTML='<span class="err"></span>';m.firstChild.textContent=e.message}
   btn.disabled=false;
 };
-$("cp2").onclick=()=>navigator.clipboard.writeText($("out2").value);
+$("cp2").onclick=()=>copy($("out2").value,$("cp2"));
 $("dl2").onclick=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([$("out2").value],{type:"text/plain;charset=utf-8"}));a.download="extracted.txt";a.click()};
 
 // ====== البحث بدون ملفات ======
@@ -328,15 +368,14 @@ async function webContext(q){
 }
 $("go3").onclick=async()=>{
   const q=$("sq").value.trim(),out=$("out3"),src=$("src3"),m=$("m3"),btn=$("go3");
-  out.className="out";src.textContent="";m.textContent="";
+  out.className="out";out.dataset.raw="";src.textContent="";m.textContent="";
   if(!q){out.className="out err";out.textContent="اكتب سؤالك أولًا";return}
   btn.disabled=true;out.textContent="جارٍ البحث…";
   try{
     const prompt=`ابحث في الإنترنت عن أحدث المعلومات وأجب بوضوح وباختصار، وبلغة السؤال نفسها.\nالسؤال: ${q}`;
-    let r,why="";
-    try{ r=await ask({search:true,text:prompt}); if(!r.sources.length&&r.by.startsWith("Gemini")) why="لم يُرجع Gemini مصادر"; }
-    catch(e1){ why=e1.message.split("\n")[0].slice(0,160); r=null; }
-    if(!r||(!r.sources.length&&why)){
+    let r=null,why="";
+    try{ r=await ask({search:true,text:prompt}); }catch(e1){ why=e1.message.split("\n")[0].slice(0,160); }
+    if(!r||(!r.sources.length&&!r.by.startsWith("Gemini"))){
       out.textContent="البحث المباشر لم يعمل، جارٍ البحث بطريقة احتياطية…";
       const ctx=await webContext(q);
       if(ctx.length){
@@ -345,8 +384,7 @@ $("go3").onclick=async()=>{
         r={text:r2.text,by:r2.by+" + بحث احتياطي",sources:ctx.map(x=>({uri:x.url,title:x.title}))};
       } else if(!r){ r=await ask({text:prompt}); r.by+=" (بدون بحث)"; }
     }
-    if(why) $("m3").dataset.why=why;
-    out.textContent=r.text; m.textContent="تمت المعالجة بواسطة: "+r.by+(why?" | سبب تعذر البحث المباشر: "+why:"");
+    setOut(out,r.text); m.textContent="تمت المعالجة بواسطة: "+r.by+(why?" | سبب تعذر البحث المباشر: "+why:"");
     const seen=new Set();
     (r.sources||[]).forEach((s,i)=>{ if(seen.has(s.uri))return; seen.add(s.uri);
       const a=document.createElement("a");a.href=s.uri;a.target="_blank";a.rel="noopener";a.textContent=(s.title||s.uri);
@@ -356,7 +394,43 @@ $("go3").onclick=async()=>{
   btn.disabled=false;
 };
 $("sq").addEventListener("keydown",e=>{if(e.key==="Enter"&&(e.ctrlKey||e.metaKey))$("go3").click()});
-$("cp3").onclick=()=>navigator.clipboard.writeText($("out3").textContent);
+$("cp3").onclick=()=>copy($("out3").dataset.raw||$("out3").textContent,$("cp3"));
+
+// ====== توليد الصور ======
+async function genImage(prompt,w,h){
+  const gk=(store.get("k_gem")||GEMINI_KEY).trim(), errs=[];
+  if(gk) for(const m of IMG_MODELS){
+    try{
+      const j=await gcall(gk,m,{contents:[{role:"user",parts:[{text:prompt}]}],generationConfig:{responseModalities:["TEXT","IMAGE"]}});
+      const p=(j.candidates?.[0]?.content?.parts||[]).find(x=>x.inlineData||x.inline_data), d=p&&(p.inlineData||p.inline_data);
+      if(d) return {src:`data:${d.mimeType||d.mime_type||"image/png"};base64,${d.data}`,by:"Gemini · "+m};
+      throw new Error("لم يرجع صورة");
+    }catch(e){errs.push(m+": "+e.message)}
+  }
+  const url=`https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=${w}&height=${h}&seed=${Math.floor(Math.random()*1e6)}&nologo=true`;
+  await new Promise((res,rej)=>{const i=new Image();const t=setTimeout(()=>rej(new Error("انتهت المهلة")),90000);
+    i.onload=()=>{clearTimeout(t);res()};i.onerror=()=>{clearTimeout(t);rej(new Error("تعذّر التوليد"+(errs.length?" | "+errs[0]:"")))};i.src=url});
+  return {src:url,by:"Pollinations"};
+}
+$("go4").onclick=async()=>{
+  const q=$("iq").value.trim(),m=$("m4"),img=$("iout"),btn=$("go4"); m.className="meta";
+  if(!q){m.className="meta err";m.textContent="اكتب وصف الصورة أولًا";return}
+  btn.disabled=true;$("dl4").hidden=true;img.hidden=true;m.textContent="جارٍ التوليد… قد يستغرق حتى دقيقة";
+  try{
+    let p=q;
+    if($("itr").checked&&/[\u0600-\u06FF]/.test(q)){
+      try{const t=(await ask({text:"Translate this image description to English. Output only the translation: "+q})).text.trim().replace(/^["']|["']$/g,""); if(t) p=t}catch(e){}
+    }
+    const [w,h]=$("isize").value.split("x"); const r=await genImage(p,w,h);
+    img.src=r.src;img.hidden=false;$("dl4").hidden=false;
+    m.textContent="بواسطة: "+r.by+(p!==q?" | الوصف المستخدم: "+p:"");
+  }catch(e){m.className="meta err";m.textContent=e.message}
+  btn.disabled=false;
+};
+$("dl4").onclick=async()=>{
+  const src=$("iout").src, a=document.createElement("a");
+  try{a.href=URL.createObjectURL(await (await fetch(src)).blob());a.download="abf-ai-image.png";a.click()}catch(e){window.open(src,"_blank")}
+};
 </script>
 </body>
 </html>
