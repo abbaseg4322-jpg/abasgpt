@@ -110,7 +110,7 @@ dialog label{display:block;font-weight:700;margin:12px 0 4px}
 
 <script>
 /* ====== ضع مفتاحك هنا ====== */
-const GEMINI_KEY = "AQ.Ab8RN6J10X-yDLLL6X5Xn8XxjagHKFfgDgJ8EO7CitFc8Qda5g";
+const GEMINI_KEY = ""; // اتركه فارغًا والصق مفتاحك من زر «المزوّدون»
 /* ========================== */
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
@@ -136,9 +136,12 @@ function providers(needVision){
   return list;
 }
 async function gemini(key,model,{text,images}){
+  key=key.trim();
   const parts=[{text}]; (images||[]).forEach(i=>parts.push({inlineData:{mimeType:i.mime,data:i.data}}));
-  const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,{
-    method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":key},body:JSON.stringify({contents:[{role:"user",parts}]})});
+  const base=`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+  const body=JSON.stringify({contents:[{role:"user",parts}]});
+  let r=await fetch(base,{method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":key},body});
+  if(r.status===401) r=await fetch(base+"?key="+encodeURIComponent(key),{method:"POST",headers:{"Content-Type":"application/json"},body});
   const j=await r.json(); if(!r.ok) throw new Error(j.error?.message||r.status);
   const t=j.candidates?.[0]?.content?.parts?.map(p=>p.text||"").join(""); if(!t) throw new Error("رد فارغ");
   return t;
