@@ -147,7 +147,9 @@ const $ = id => document.getElementById(id);
 const store = { get:k=>{try{return localStorage.getItem(k)||""}catch(e){return ""}}, set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}} };
 
 // شاشة الترحيب: ثانيتان ثم تختفي ويبقى الشعار في الأعلى
-setTimeout(()=>{$("splash").classList.add("hide");setTimeout(()=>$("splash").remove(),600)},2000);
+let skipSplash=false; try{skipSplash=sessionStorage.getItem("noSplash")==="1";sessionStorage.removeItem("noSplash")}catch(e){}
+if(skipSplash) $("splash").remove();
+else setTimeout(()=>{$("splash").classList.add("hide");setTimeout(()=>$("splash").remove(),600)},2000);
 
 // قفل خانة المزوّدين (حماية واجهة فقط، وليست حماية خادم)
 const PIN_HASH="07d41edc545de21a114858a3ede9d13045ee5609c66999562826992b4b591291";
@@ -160,6 +162,8 @@ async function tryUnlock(){
   if(ok){unlocked=true;showKeys()} else $("pinerr").textContent="الرمز غير صحيح";
 }
 $("unlock").onclick=tryUnlock;
+// عند الحفظ أو الإغلاق: تُعاد الصفحة فيعود القفل (بدون إعادة شاشة الترحيب)
+dlg.addEventListener("close",()=>{try{sessionStorage.setItem("noSplash","1")}catch(e){} location.reload()});
 $("pin").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();tryUnlock()}});
 // تبويبات
 document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>{
