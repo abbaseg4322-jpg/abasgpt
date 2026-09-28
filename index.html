@@ -55,6 +55,7 @@ dialog label{display:block;font-weight:700;margin:12px 0 4px}
 <div class="tabs" role="tablist">
   <button class="on" data-t="p1">الملفات</button>
   <button data-t="p2">نص من صورة</button>
+  <button data-t="p3">بحث</button>
 </div>
 
 <section class="panel on" id="p1">
@@ -91,6 +92,13 @@ dialog label{display:block;font-weight:700;margin:12px 0 4px}
   <textarea id="out2" placeholder="سيظهر النص هنا وتستطيع تعديله" style="min-height:200px"></textarea>
   <div class="row"><button class="sec" id="cp2">نسخ</button><button class="sec" id="dl2">تنزيل TXT</button></div>
   <div class="meta" id="m2"></div>
+</section>
+<section class="panel" id="p3">
+  <textarea id="sq" placeholder="اكتب سؤالك وسيبحث الموقع في الإنترنت ويجيبك مع المصادر" style="min-height:90px"></textarea>
+  <div class="row"><button class="pri" id="go3">ابحث</button><button class="sec" id="cp3">نسخ الإجابة</button></div>
+  <div class="out" id="out3"></div>
+  <div id="src3" class="meta"></div>
+  <div class="meta" id="m3"></div>
 </section>
 </div>
 
@@ -146,16 +154,17 @@ function providers(needVision){
   if(gq&&!needVision) list.push({name:"Groq · llama-3.3-70b",vision:false,limit:24000,run:(p)=>openai("https://api.groq.com/openai/v1/chat/completions",gq,"llama-3.3-70b-versatile",p)});
   return list;
 }
-async function gemini(key,model,{text,images}){
+async function gemini(key,model,{text,images,search}){
   key=key.trim();
   const parts=[{text}]; (images||[]).forEach(i=>parts.push({inlineData:{mimeType:i.mime,data:i.data}}));
   const base=`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
-  const body=JSON.stringify({contents:[{role:"user",parts}]});
+  const body=JSON.stringify({contents:[{role:"user",parts}],...(search?{tools:[{google_search:{}}]}:{})});
   let r=await fetch(base,{method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":key},body});
   if(r.status===401) r=await fetch(base+"?key="+encodeURIComponent(key),{method:"POST",headers:{"Content-Type":"application/json"},body});
   const j=await r.json(); if(!r.ok) throw new Error(j.error?.message||r.status);
   const t=j.candidates?.[0]?.content?.parts?.map(p=>p.text||"").join(""); if(!t) throw new Error("رد فارغ");
-  return t;
+  const sources=(j.candidates[0].groundingMetadata?.groundingChunks||[]).map(c=>c.web).filter(Boolean);
+  return {text:t,sources};
 }
 async function openai(url,key,model,{text}){
   const r=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+key},
@@ -168,7 +177,8 @@ async function ask(payload){
   for(const p of providers(hasImg)){
     try{
       const t=payload.text.length>p.limit?payload.text.slice(0,p.limit)+"\n[...تم اقتطاع الباقي]":payload.text;
-      return {text:await p.run({...payload,text:t}),by:p.name};
+      let r=await p.run({...payload,text:t}); if(typeof r==="string") r={text:r,sources:[]};
+      return {...r,by:p.name+(payload.search&&!p.name.startsWith("Gemini")?" (بدون بحث مباشر)":"")};
     }catch(e){errs.push(p.name+": "+e.message)}
   }
   throw new Error(errs.length?errs.join("\n"):"لا يوجد مزوّد متاح");
@@ -259,6 +269,26 @@ $("go2").onclick=async()=>{
 };
 $("cp2").onclick=()=>navigator.clipboard.writeText($("out2").value);
 $("dl2").onclick=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([$("out2").value],{type:"text/plain;charset=utf-8"}));a.download="extracted.txt";a.click()};
+
+// ====== البحث بدون ملفات ======
+$("go3").onclick=async()=>{
+  const q=$("sq").value.trim(),out=$("out3"),src=$("src3"),m=$("m3"),btn=$("go3");
+  out.className="out";src.textContent="";m.textContent="";
+  if(!q){out.className="out err";out.textContent="اكتب سؤالك أولًا";return}
+  btn.disabled=true;out.textContent="جارٍ البحث…";
+  try{
+    const r=await ask({search:true,text:`ابحث في الإنترنت عن أحدث المعلومات وأجب بوضوح وباختصار، وبلغة السؤال نفسها.\nالسؤال: ${q}`});
+    out.textContent=r.text; m.textContent="تمت المعالجة بواسطة: "+r.by;
+    const seen=new Set();
+    (r.sources||[]).forEach((s,i)=>{ if(seen.has(s.uri))return; seen.add(s.uri);
+      const a=document.createElement("a");a.href=s.uri;a.target="_blank";a.rel="noopener";a.textContent=(s.title||s.uri);
+      a.style.cssText="display:block;color:var(--acc);word-break:break-all";src.appendChild(a)});
+    if(seen.size) src.prepend("المصادر:");
+  }catch(e){out.className="out err";out.textContent=e.message}
+  btn.disabled=false;
+};
+$("sq").addEventListener("keydown",e=>{if(e.key==="Enter"&&(e.ctrlKey||e.metaKey))$("go3").click()});
+$("cp3").onclick=()=>navigator.clipboard.writeText($("out3").textContent);
 </script>
 </body>
 </html>
