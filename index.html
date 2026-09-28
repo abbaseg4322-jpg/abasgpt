@@ -37,7 +37,7 @@ button.pri{background:var(--btn);border-color:var(--btn);color:#fff;box-shadow:0
 button.pri:disabled{opacity:.5;cursor:wait}
 button.sec{background:none;color:var(--acc)}
 .out{white-space:pre-wrap;margin-top:6px}
-.meta{font-size:.82rem;color:var(--mut);margin-top:8px}
+.meta{white-space:pre-wrap;font-size:.82rem;color:var(--mut);margin-top:8px}
 .err{color:var(--err);font-weight:700}
 img.prev{max-width:100%;max-height:300px;border-radius:10px;margin-top:10px;display:block}
 dialog{border:1px solid var(--line);border-radius:14px;background:var(--card);color:var(--ink);max-width:460px;width:92%;font-family:inherit}
@@ -146,6 +146,8 @@ dialog label{display:block;font-weight:700;margin:12px 0 4px}
     <input type="password" id="k_or" dir="ltr">
     <label>مفتاح Tavily للبحث (اختياري)</label>
     <input type="password" id="k_tav" dir="ltr">
+    <label>مفتاح Pollinations للصور (اختياري)</label>
+    <input type="password" id="k_pol" dir="ltr">
     <label>مفتاح Groq (نص فقط)</label>
     <input type="password" id="k_groq" dir="ltr">
     <div class="row"><button class="pri" id="save" value="ok">حفظ</button><button class="sec" value="x">إغلاق</button></div>
@@ -202,8 +204,8 @@ document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>{
   b.classList.add("on"); $(b.dataset.t).classList.add("on");
 });
 // إعدادات
-["gem","or","groq","tav"].forEach(n=>$("k_"+n).value=store.get("k_"+n));
-$("save").onclick=()=>["gem","or","groq","tav"].forEach(n=>store.set("k_"+n,$("k_"+n).value.trim()));
+["gem","or","groq","tav","pol"].forEach(n=>$("k_"+n).value=store.get("k_"+n));
+$("save").onclick=()=>["gem","or","groq","tav","pol"].forEach(n=>store.set("k_"+n,$("k_"+n).value.trim()));
 
 // ====== الموجّه: تسلسل المزوّدين والمودلات ======
 let IMG_MODELS=["gemini-2.5-flash-image"];
@@ -399,18 +401,24 @@ $("cp3").onclick=()=>copy($("out3").dataset.raw||$("out3").textContent,$("cp3"))
 // ====== توليد الصور ======
 async function genImage(prompt,w,h){
   const gk=(store.get("k_gem")||GEMINI_KEY).trim(), errs=[];
-  if(gk) for(const m of IMG_MODELS){
+  if(gk&&!window.IMG_SKIP) for(const m of IMG_MODELS){
     try{
       const j=await gcall(gk,m,{contents:[{role:"user",parts:[{text:prompt}]}],generationConfig:{responseModalities:["TEXT","IMAGE"]}});
       const p=(j.candidates?.[0]?.content?.parts||[]).find(x=>x.inlineData||x.inline_data), d=p&&(p.inlineData||p.inline_data);
       if(d) return {src:`data:${d.mimeType||d.mime_type||"image/png"};base64,${d.data}`,by:"Gemini · "+m};
       throw new Error("لم يرجع صورة");
-    }catch(e){errs.push(m+": "+e.message)}
+    }catch(e){errs.push(m+": "+e.message); if(/limit: 0/.test(e.message)) window.IMG_SKIP=true}
   }
-  const url=`https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=${w}&height=${h}&seed=${Math.floor(Math.random()*1e6)}&nologo=true`;
-  await new Promise((res,rej)=>{const i=new Image();const t=setTimeout(()=>rej(new Error("انتهت المهلة")),90000);
-    i.onload=()=>{clearTimeout(t);res()};i.onerror=()=>{clearTimeout(t);rej(new Error("تعذّر التوليد"+(errs.length?" | "+errs[0]:"")))};i.src=url});
-  return {src:url,by:"Pollinations"};
+  const load=url=>new Promise((res,rej)=>{const i=new Image();i.referrerPolicy="no-referrer";const t=setTimeout(()=>rej(new Error("انتهت المهلة")),90000);
+    i.onload=()=>{clearTimeout(t);res(url)};i.onerror=()=>{clearTimeout(t);rej(new Error("تعذّر تحميل الصورة"))};i.src=url});
+  const q=encodeURIComponent(prompt), seed=Math.floor(Math.random()*1e6), pk=store.get("k_pol").trim();
+  const tries=[];
+  if(pk) tries.push(["Pollinations (بمفتاح)",`https://gen.pollinations.ai/image/${q}?width=${w}&height=${h}&seed=${seed}&model=flux&key=${encodeURIComponent(pk)}`]);
+  tries.push(["Pollinations",`https://image.pollinations.ai/prompt/${q}?width=${w}&height=${h}&seed=${seed}&model=flux&nologo=true`]);
+  for(const [name,url] of tries){
+    try{ return {src:await load(url),by:name}; }catch(e){errs.push(name+": "+e.message)}
+  }
+  throw new Error("تعذّر توليد الصورة.\n"+errs.map(x=>x.slice(0,140)).join("\n"));
 }
 $("go4").onclick=async()=>{
   const q=$("iq").value.trim(),m=$("m4"),img=$("iout"),btn=$("go4"); m.className="meta";
