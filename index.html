@@ -139,7 +139,7 @@ dialog label{display:block;font-weight:700;margin:12px 0 4px}
       <div class="row"><button type="button" class="pri" id="unlock">فتح</button><button class="sec" value="x">إغلاق</button></div>
     </div>
     <div id="keysbox" hidden>
-    <p class="meta">Gemini مضبوط في الكود. إذا انتهت حصته ينتقل الموقع تلقائيًا إلى المزوّدين التاليين إن أضفت مفاتيحهم (تُحفظ في متصفحك).</p>
+    <p class="meta">المفاتيح الافتراضية للموقع مضبوطة في الكود. المفتاح الذي تضيفه هنا يُحفظ في متصفحك أنت فقط ويُقدَّم عليها. إذا انتهت حصة Gemini ينتقل الموقع تلقائيًا إلى المزوّدين التاليين إن أضفت مفاتيحهم (تُحفظ في متصفحك).</p>
     <label>مفتاح Gemini (يستبدل مفتاح الكود)</label>
     <input type="password" id="k_gem" dir="ltr">
     <label>مفتاح OpenRouter (نص فقط)</label>
@@ -156,13 +156,17 @@ dialog label{display:block;font-weight:700;margin:12px 0 4px}
 </dialog>
 
 <script>
-/* ====== ضع مفتاحك هنا ====== */
-const GEMINI_KEY = ""; // اتركه فارغًا والصق مفتاحك من زر «المزوّدون»
-/* ========================== */
+/* ====== المفاتيح المشتركة لكل زوّار الموقع ======
+   ضع المفتاح بين علامتي الاقتباس. سيراه أي شخص يفتح كود الموقع، فاستخدم مفتاحًا مخصصًا لهذا الموقع فقط.
+   ما يضيفه المستخدم من زر «المزوّدون» يُقدَّم على هذه المفاتيح في متصفحه. */
+const GEMINI_KEY = "AQ.Ab8RN6KFU2L6j-kXU3IJM6FEUpQ08GRImQEC_8-czbOjqgmuDQ";
+const SHARED = { or:"", groq:"", tav:"", pol:"sk_8B1parVy0SKXLjSGieE9cNCx3axYQC7D" };
+/* ============================================= */
 
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 const $ = id => document.getElementById(id);
 const store = { get:k=>{try{return localStorage.getItem(k)||""}catch(e){return ""}}, set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}} };
+const K=n=>(store.get("k_"+n)||(n==="gem"?GEMINI_KEY:SHARED[n])||"").trim();
 
 // شاشة الترحيب: ثانيتان ثم تختفي ويبقى الشعار في الأعلى
 let skipSplash=false; try{skipSplash=sessionStorage.getItem("noSplash")==="1";sessionStorage.removeItem("noSplash")}catch(e){}
@@ -211,7 +215,7 @@ $("save").onclick=()=>["gem","or","groq","tav","pol"].forEach(n=>store.set("k_"+
 let IMG_MODELS=["gemini-2.5-flash-image"];
 let GEM_MODELS=["gemini-3.8-flash","gemini-3.5-flash-lite"];
 (async()=>{ // يجلب المودلات المتاحة فعليًا لمفتاحك، ويبقي القائمة أعلاه احتياطًا
-  const k=(store.get("k_gem")||GEMINI_KEY).trim(); if(!k) return;
+  const k=K("gem"); if(!k) return;
   try{
     const r=await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=100",{headers:{"x-goog-api-key":k}});
     const j=await r.json();
@@ -224,9 +228,9 @@ let GEM_MODELS=["gemini-3.8-flash","gemini-3.5-flash-lite"];
   }catch(e){}
 })();
 function providers(needVision){
-  const list=[], gk=store.get("k_gem")||GEMINI_KEY;
+  const list=[], gk=K("gem");
   if(gk) GEM_MODELS.forEach(m=>list.push({name:"Gemini · "+m,vision:true,limit:300000,run:(p)=>gemini(gk,m,p)}));
-  const or=store.get("k_or"), gq=store.get("k_groq");
+  const or=K("or"), gq=K("groq");
   if(or&&!needVision) list.push({name:"OpenRouter · llama-3.3-70b",vision:false,limit:60000,run:(p)=>openai("https://openrouter.ai/api/v1/chat/completions",or,"meta-llama/llama-3.3-70b-instruct:free",p)});
   if(gq&&!needVision) list.push({name:"Groq · llama-3.3-70b",vision:false,limit:24000,run:(p)=>openai("https://api.groq.com/openai/v1/chat/completions",gq,"llama-3.3-70b-versatile",p)});
   return list;
@@ -354,7 +358,7 @@ $("dl2").onclick=()=>{const a=document.createElement("a");a.href=URL.createObjec
 
 // ====== البحث بدون ملفات ======
 async function webContext(q){
-  const tk=store.get("k_tav").trim();
+  const tk=K("tav");
   if(tk){
     try{
       const r=await fetch("https://api.tavily.com/search",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+tk},body:JSON.stringify({query:q,max_results:5})});
@@ -400,7 +404,7 @@ $("cp3").onclick=()=>copy($("out3").dataset.raw||$("out3").textContent,$("cp3"))
 
 // ====== توليد الصور ======
 async function genImage(prompt,w,h){
-  const gk=(store.get("k_gem")||GEMINI_KEY).trim(), errs=[];
+  const gk=K("gem"), errs=[];
   if(gk&&!window.IMG_SKIP) for(const m of IMG_MODELS){
     try{
       const j=await gcall(gk,m,{contents:[{role:"user",parts:[{text:prompt}]}],generationConfig:{responseModalities:["TEXT","IMAGE"]}});
@@ -411,7 +415,7 @@ async function genImage(prompt,w,h){
   }
   const load=url=>new Promise((res,rej)=>{const i=new Image();i.referrerPolicy="no-referrer";const t=setTimeout(()=>rej(new Error("انتهت المهلة")),90000);
     i.onload=()=>{clearTimeout(t);res(url)};i.onerror=()=>{clearTimeout(t);rej(new Error("تعذّر تحميل الصورة"))};i.src=url});
-  const q=encodeURIComponent(prompt), seed=Math.floor(Math.random()*1e6), pk=store.get("k_pol").trim();
+  const q=encodeURIComponent(prompt), seed=Math.floor(Math.random()*1e6), pk=K("pol");
   const tries=[];
   if(pk) tries.push(["Pollinations (بمفتاح)",`https://gen.pollinations.ai/image/${q}?width=${w}&height=${h}&seed=${seed}&model=flux&key=${encodeURIComponent(pk)}`]);
   tries.push(["Pollinations",`https://image.pollinations.ai/prompt/${q}?width=${w}&height=${h}&seed=${seed}&model=flux&nologo=true`]);
