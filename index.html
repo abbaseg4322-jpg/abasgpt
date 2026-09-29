@@ -159,13 +159,20 @@ dialog label{display:block;font-weight:700;margin:12px 0 4px}
 /* ====== المفاتيح المشتركة لكل زوّار الموقع ======
    ضع المفتاح بين علامتي الاقتباس. سيراه أي شخص يفتح كود الموقع، فاستخدم مفتاحًا مخصصًا لهذا الموقع فقط.
    ما يضيفه المستخدم من زر «المزوّدون» يُقدَّم على هذه المفاتيح في متصفحه. */
-const GEMINI_KEY = "AQ.Ab8RN6KFU2L6j-kXU3IJM6FEUpQ08GRImQEC_8-czbOjqgmuDQ";
+const GEMINI_KEY = "AQ.Ab8RN6IEq3Jir3FsWb-zLYdOCKZ5d9l1UmSXf0GVNfM0te917A";
 const SHARED = { or:"", groq:"", tav:"", pol:"sk_8B1parVy0SKXLjSGieE9cNCx3axYQC7D" };
 /* ============================================= */
 
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 const $ = id => document.getElementById(id);
 const store = { get:k=>{try{return localStorage.getItem(k)||""}catch(e){return ""}}, set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}} };
+const AUTHERR=/credentials|API key not valid|API_KEY_INVALID|UNAUTHENTICATED|expired|^401$/i;
+// إن فشل المفتاح المحفوظ في المتصفح بسبب مصادقة، يجرّب مفتاح الكود تلقائيًا
+async function withKeys(fn){
+  const ks=[...new Set([store.get("k_gem").trim(),GEMINI_KEY.trim()].filter(Boolean))]; let last=new Error("لا يوجد مفتاح Gemini");
+  for(const k of ks){ try{return await fn(k)}catch(e){last=e; if(!AUTHERR.test(e.message)) throw e} }
+  throw last;
+}
 const K=n=>(store.get("k_"+n)||(n==="gem"?GEMINI_KEY:SHARED[n])||"").trim();
 
 // شاشة الترحيب: ثانيتان ثم تختفي ويبقى الشعار في الأعلى
@@ -229,7 +236,7 @@ let GEM_MODELS=["gemini-3.8-flash","gemini-3.5-flash-lite"];
 })();
 function providers(needVision){
   const list=[], gk=K("gem");
-  if(gk) GEM_MODELS.forEach(m=>list.push({name:"Gemini · "+m,vision:true,limit:300000,run:(p)=>gemini(gk,m,p)}));
+  if(gk) GEM_MODELS.forEach(m=>list.push({name:"Gemini · "+m,vision:true,limit:300000,run:(p)=>withKeys(k=>gemini(k,m,p))}));
   const or=K("or"), gq=K("groq");
   if(or&&!needVision) list.push({name:"OpenRouter · llama-3.3-70b",vision:false,limit:60000,run:(p)=>openai("https://openrouter.ai/api/v1/chat/completions",or,"meta-llama/llama-3.3-70b-instruct:free",p)});
   if(gq&&!needVision) list.push({name:"Groq · llama-3.3-70b",vision:false,limit:24000,run:(p)=>openai("https://api.groq.com/openai/v1/chat/completions",gq,"llama-3.3-70b-versatile",p)});
@@ -407,7 +414,7 @@ async function genImage(prompt,w,h){
   const gk=K("gem"), errs=[];
   if(gk&&!window.IMG_SKIP) for(const m of IMG_MODELS){
     try{
-      const j=await gcall(gk,m,{contents:[{role:"user",parts:[{text:prompt}]}],generationConfig:{responseModalities:["TEXT","IMAGE"]}});
+      const j=await withKeys(k=>gcall(k,m,{contents:[{role:"user",parts:[{text:prompt}]}],generationConfig:{responseModalities:["TEXT","IMAGE"]}}));
       const p=(j.candidates?.[0]?.content?.parts||[]).find(x=>x.inlineData||x.inline_data), d=p&&(p.inlineData||p.inline_data);
       if(d) return {src:`data:${d.mimeType||d.mime_type||"image/png"};base64,${d.data}`,by:"Gemini · "+m};
       throw new Error("لم يرجع صورة");
