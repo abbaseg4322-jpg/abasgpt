@@ -58,6 +58,12 @@ dialog label{display:block;font-weight:700;margin:12px 0 4px}
 .out code{direction:ltr;unicode-bidi:embed;background:var(--field);padding:1px 6px;border-radius:6px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.9em}
 .out pre code{background:none;padding:0}
 @media(max-width:480px){.tabs button{font-size:.85rem;padding:8px 4px}}
+
+.meterwrap{height:22px;background:var(--field);border:1px solid var(--line);border-radius:11px;overflow:hidden;margin:12px 0 6px}
+.meter{height:100%;width:0;background:linear-gradient(90deg,#2fd97c,#ffd23f,#ff6b5e);transition:width 1.2s ease;border-radius:10px}
+.pct{font-size:1.7rem;font-weight:800;text-align:center}
+.verdict{text-align:center;font-size:1.15rem;font-weight:700;margin-top:4px}
+.badge{display:inline-block;padding:2px 10px;border-radius:20px;font-size:.85rem;font-weight:700}
 </style>
 </head>
 <body>
@@ -73,6 +79,7 @@ dialog label{display:block;font-weight:700;margin:12px 0 4px}
   <button data-t="p2">نص من صورة</button>
   <button data-t="p3">بحث</button>
   <button data-t="p4">صور</button>
+  <button data-t="p5">أساليب البحوث</button>
 </div>
 
 <section class="panel on" id="p1">
@@ -112,9 +119,10 @@ dialog label{display:block;font-weight:700;margin:12px 0 4px}
 </section>
 <section class="panel" id="p3">
   <textarea id="sq" placeholder="اكتب سؤالك وسيبحث الموقع في الإنترنت ويجيبك مع المصادر" style="min-height:90px"></textarea>
-  <div class="row"><button class="pri" id="go3">ابحث</button><button class="sec" id="cp3">نسخ الإجابة</button></div>
+  <div class="row"><select id="sdepth"><option value="fast">سريع</option><option value="detailed" selected>مفصّل</option><option value="deep">معمّق</option></select><button class="pri" id="go3">ابحث</button><button class="sec" id="cp3">نسخ الإجابة</button></div>
   <div class="out" id="out3"></div>
   <div id="src3" class="meta"></div>
+  <div id="fu3" class="row"></div>
   <div class="meta" id="m3"></div>
 </section>
 <section class="panel" id="p4">
@@ -126,6 +134,22 @@ dialog label{display:block;font-weight:700;margin:12px 0 4px}
   <div class="row"><button class="pri" id="go4">ولّد الصورة</button><button class="sec" id="dl4" hidden>تنزيل</button></div>
   <img class="prev" id="iout" hidden alt="الصورة المولّدة" style="max-height:none">
   <div class="meta" id="m4"></div>
+</section>
+
+<section class="panel" id="p5">
+  <div class="drop" id="drop5" tabindex="0">
+    <b>ارفع الأطروحة أو التقرير هنا</b>
+    PDF ، Word ، أو صورة مسح ضوئي للبحث
+  </div>
+  <input type="file" id="f5" hidden accept=".pdf,.docx,image/*">
+  <div class="file" id="fname5"></div>
+  <div class="row"><button class="pri" id="go5">تحليل نسبة الذكاء الاصطناعي</button></div>
+  <div class="bar" id="bar5"></div>
+  <div class="verdict" id="v5"></div>
+  <div class="meterwrap"><div class="meter" id="meter5"></div></div>
+  <div class="pct" id="pct5"></div>
+  <div class="out" id="out5"></div>
+  <div class="meta" id="m5"></div>
 </section>
 <footer class="meta" style="text-align:center;margin:18px 0 6px">abf ai · تطوير الإعلامي عباس بركات فرحان</footer>
 </div>
@@ -262,27 +286,34 @@ async function gcall(key,model,body){
   const j=await r.json(); if(!r.ok) throw new Error(j.error?.message||r.status);
   return j;
 }
-async function gemini(key,model,{text,images,search}){
+async function gemini(key,model,{text,images,search,maxTokens}){
   const parts=[{text}]; (images||[]).forEach(i=>parts.push({inlineData:{mimeType:i.mime,data:i.data}}));
-  const j=await gcall(key,model,{contents:[{role:"user",parts}],...(search?{tools:[{google_search:{}}]}:{})});
+  const j=await gcall(key,model,{contents:[{role:"user",parts}],...(search?{tools:[{google_search:{}}]}:{}),...(maxTokens?{generationConfig:{maxOutputTokens:maxTokens}}:{})});
   const t=j.candidates?.[0]?.content?.parts?.map(p=>p.text||"").join(""); if(!t) throw new Error("رد فارغ");
   const sources=(j.candidates[0].groundingMetadata?.groundingChunks||[]).map(c=>c.web).filter(Boolean);
   return {text:t,sources};
 }
-async function openai(url,key,model,{text}){
+async function openai(url,key,model,{text,maxTokens}){
   const r=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json",...(key?{Authorization:"Bearer "+key}:{})},
-    body:JSON.stringify({model,messages:[{role:"user",content:text}]})});
+    body:JSON.stringify({model,messages:[{role:"user",content:text}],...(maxTokens?{max_tokens:Math.min(maxTokens,4096)}:{})})});
   const j=await r.json(); if(!r.ok) throw new Error(j.error?.message||r.status);
   return j.choices[0].message.content;
 }
+const BAD={};
 async function ask(payload){
   const hasImg=(payload.images||[]).length>0, errs=[];
-  for(const p of providers(hasImg)){
+  let list=providers(hasImg); const ok=list.filter(p=>!(BAD[p.name]>Date.now())); if(ok.length) list=ok;
+  const li=list.findIndex(p=>p.name===window.LAST_OK); if(li>0) list.unshift(list.splice(li,1)[0]);
+  for(const p of list){
     try{
       const t=payload.text.length>p.limit?payload.text.slice(0,p.limit)+"\n[...تم اقتطاع الباقي]":payload.text;
       let r=await p.run({...payload,text:t}); if(typeof r==="string") r={text:r,sources:[]};
+      if(p.name.startsWith("Gemini")) window.LAST_OK=p.name;
       return {...r,by:p.name+(payload.search&&!p.name.startsWith("Gemini")?" (بدون بحث مباشر)":"")};
-    }catch(e){errs.push(p.name+": "+e.message)}
+    }catch(e){
+      errs.push(p.name+": "+e.message);
+      if(/quota|credentials|exceeded|not found|no longer available|API key/i.test(e.message)) BAD[p.name]=Date.now()+90000;
+    }
   }
   const hint=errs.length&&errs.every(e=>/credentials/i.test(e))?"\n\nملاحظة: Google ترفض مفاتيح Gemini من نوع AQ لبعض الحسابات (مشكلة معروفة عندها). أضف مفتاح Groq أو OpenRouter من «المزوّدون» ليعمل الموقع بدونها.":"";
   throw new Error(errs.length?errs.map(e=>e.length>150?e.slice(0,150)+"…":e).join("\n")+hint:"لا يوجد مفتاح. اضغط «المزوّدون» وأضف مفتاح Gemini");
@@ -382,47 +413,115 @@ async function webContext(q){
   const tk=K("tav");
   if(tk||PROXY){
     try{
-      const r=await fetch(PROXY?PROXY+"/tavily/search":"https://api.tavily.com/search",{method:"POST",headers:{"Content-Type":"application/json",...(tk?{Authorization:"Bearer "+tk}:{})},body:JSON.stringify({query:q,max_results:5})});
+      const r=await fetch(PROXY?PROXY+"/tavily/search":"https://api.tavily.com/search",{method:"POST",headers:{"Content-Type":"application/json",...(tk?{Authorization:"Bearer "+tk}:{})},body:JSON.stringify({query:q,max_results:8})});
       const j=await r.json(); if(r.ok&&j.results?.length) return j.results.map(x=>({title:x.title,url:x.url,content:(x.content||"").slice(0,1500)}));
     }catch(e){}
   }
   const l=/[\u0600-\u06FF]/.test(q)?"ar":"en";
   try{
-    const u=`https://${l}.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(q)}&gsrlimit=4&prop=extracts&exintro=1&explaintext=1&exlimit=4&format=json&origin=*`;
+    const u=`https://${l}.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(q)}&gsrlimit=5&prop=extracts&exintro=1&explaintext=1&exlimit=5&format=json&origin=*`;
     const j=await (await fetch(u)).json();
-    return Object.values(j.query?.pages||{}).sort((a,b)=>a.index-b.index).map(p=>({title:p.title,url:`https://${l}.wikipedia.org/wiki/${encodeURIComponent(p.title.replace(/ /g,"_"))}`,content:(p.extract||"").slice(0,1500)}));
+    return Object.values(j.query?.pages||{}).sort((a,b)=>a.index-b.index).map(p=>({title:p.title,url:`https://${l}.wikipedia.org/wiki/${encodeURIComponent(p.title.replace(/ /g,"_"))}`,content:(p.extract||"").slice(0,2500)}));
   }catch(e){return []}
 }
-$("go3").onclick=async()=>{
-  const q=$("sq").value.trim(),out=$("out3"),src=$("src3"),m=$("m3"),btn=$("go3");
-  out.className="out";out.dataset.raw="";src.textContent="";m.textContent="";
+const DEPTH={
+  fast:"أجب بإيجاز مفيد في فقرة أو فقرتين مع أهم الحقائق.",
+  detailed:"اكتب إجابة شاملة ومنظمة: ابدأ بالخلاصة في جملتين، ثم التفاصيل بعناوين فرعية ونقاط، مع الأرقام والتواريخ والأسماء حين تتوفر، ثم ملاحظات أو خلافات بين المصادر إن وُجدت. لا تختصر ولا تتجاهل جانبًا مهمًا.",
+  deep:"اكتب تقريرًا معمّقًا ومنظمًا يغطي كل الجوانب الفرعية المذكورة أدناه، بعناوين ونقاط وأرقام وتواريخ ومقارنات حين تلزم، وانتهِ بخلاصة وتوصية عملية إن كان السؤال يحتمل ذلك."
+};
+async function doSearch(q){
+  const out=$("out3"),src=$("src3"),m=$("m3"),btn=$("go3"),depth=$("sdepth").value,fu=$("fu3");
+  out.className="out";out.dataset.raw="";src.textContent="";m.textContent="";fu.textContent="";
   if(!q){out.className="out err";out.textContent="اكتب سؤالك أولًا";return}
-  btn.disabled=true;out.textContent="جارٍ البحث…";
+  btn.disabled=true; const t0=Date.now(); let busyMsg="";
+  const busy=t=>{busyMsg=t;out.textContent=t}, tick=setInterval(()=>{if(busyMsg)out.textContent=busyMsg+" ("+Math.round((Date.now()-t0)/1000)+" ث)"},1000);
   try{
-    const prompt=`ابحث في الإنترنت عن أحدث المعلومات وأجب بوضوح وباختصار، وبلغة السؤال نفسها.\nالسؤال: ${q}`;
+    let subs="";
+    if(depth==="deep"){
+      busy("أحلّل السؤال وأحدد جوانبه…");
+      try{subs=(await ask({text:`حلّل السؤال التالي واكتب 4 أسئلة فرعية تغطي جوانبه الأساسية لبحث شامل. اكتب كل سؤال في سطر يبدأ بـ "- " وبنفس لغة السؤال، دون أي شرح.\nالسؤال: ${q}`,maxTokens:1024})).text.trim()}catch(e){}
+    }
+    const today=new Date().toLocaleDateString("ar",{year:"numeric",month:"long",day:"numeric"});
+    const prompt=`أنت باحث خبير. تاريخ اليوم: ${today}.
+افهم قصد السائل الحقيقي حتى لو كان سؤاله مختصرًا أو ناقصًا أو فيه أخطاء إملائية. وإن كان غامضًا فاذكر في سطر واحد كيف فسّرته ثم أجب مغطيًا أهم التفسيرات.
+${DEPTH[depth]}
+${subs?"الجوانب المطلوب تغطيتها:\n"+subs+"\n":""}أجب بلغة السؤال نفسها، ولا تخترع معلومات غير مدعومة بنتائج البحث.
+في آخر الإجابة أضف ثلاثة أسئلة متابعة مقترحة، كل سؤال في سطر مستقل يبدأ بـ Q: فقط.
+السؤال: ${q}`;
+    const mt=depth==="fast"?4096:8192;
+    busy("أبحث في الإنترنت…");
     let r=null,why="";
-    try{ r=await ask({search:true,text:prompt}); }catch(e1){ why=e1.message.split("\n")[0].slice(0,160); }
+    try{ r=await ask({search:true,text:prompt,maxTokens:mt}); }catch(e1){ why=e1.message.split("\n")[0].slice(0,160); }
     if(!r||(!r.sources.length&&!r.by.startsWith("Gemini"))){
-      out.textContent="البحث المباشر لم يعمل، جارٍ البحث بطريقة احتياطية…";
+      busy("البحث المباشر لم يعمل، جارٍ البحث بطريقة احتياطية…");
       const ctx=await webContext(q);
       if(ctx.length){
         const c=ctx.map((x,i)=>`[${i+1}] ${x.title}\n${x.content}`).join("\n\n");
-        const r2=await ask({text:`اعتمد على نتائج البحث التالية للإجابة، وإن لم تكفِ فاذكر ذلك بصراحة.\nالسؤال: ${q}\n\n=== نتائج البحث ===\n${c}`});
+        const r2=await ask({text:`${prompt}\n\n=== نتائج البحث (اعتمد عليها، وإن لم تكفِ فاذكر ذلك بصراحة) ===\n${c}`,maxTokens:mt});
         r={text:r2.text,by:r2.by+" + بحث احتياطي",sources:ctx.map(x=>({uri:x.url,title:x.title}))};
-      } else if(!r){ r=await ask({text:prompt}); r.by+=" (بدون بحث)"; }
+      } else if(!r){ r=await ask({text:prompt,maxTokens:mt}); r.by+=" (بدون بحث)"; }
     }
-    setOut(out,r.text); m.textContent="تمت المعالجة بواسطة: "+r.by+(why?" | سبب تعذر البحث المباشر: "+why:"");
+    busyMsg="";
+    const follow=[...r.text.matchAll(/^\s*Q:\s*(.+)$/gm)].map(x=>x[1].trim()).slice(0,3);
+    setOut(out,r.text.replace(/^\s*Q:\s*.+$/gm,"").trim());
+    m.textContent="تمت المعالجة بواسطة: "+r.by+" · "+Math.round((Date.now()-t0)/1000)+" ث"+(why?" | سبب تعذر البحث المباشر: "+why:"");
     const seen=new Set();
-    (r.sources||[]).forEach((s,i)=>{ if(seen.has(s.uri))return; seen.add(s.uri);
+    (r.sources||[]).forEach(s=>{ if(seen.has(s.uri))return; seen.add(s.uri);
       const a=document.createElement("a");a.href=s.uri;a.target="_blank";a.rel="noopener";a.textContent=(s.title||s.uri);
       a.style.cssText="display:block;color:var(--acc);word-break:break-all";src.appendChild(a)});
     if(seen.size) src.prepend("المصادر:");
-  }catch(e){out.className="out err";out.textContent=e.message}
-  btn.disabled=false;
-};
+    follow.forEach(t=>{const b=document.createElement("button");b.className="sec";b.textContent=t;b.style.cssText="text-align:start;font-weight:500";
+      b.onclick=()=>{$("sq").value=t;doSearch(t)};fu.appendChild(b)});
+  }catch(e){busyMsg="";out.className="out err";out.textContent=e.message}
+  clearInterval(tick); btn.disabled=false;
+}
+$("go3").onclick=()=>doSearch($("sq").value.trim());
 $("sq").addEventListener("keydown",e=>{if(e.key==="Enter"&&(e.ctrlKey||e.metaKey))$("go3").click()});
 $("cp3").onclick=()=>copy($("out3").dataset.raw||$("out3").textContent,$("cp3"));
 
+
+// ====== أساليب البحوث: تقدير نسبة الذكاء الاصطناعي في بحث ======
+let file5=null;
+drop($("drop5"),$("f5"),f=>{file5=f;$("fname5").textContent="📎 "+f.name;$("v5").textContent="";$("meter5").style.width="0";$("pct5").textContent="";$("out5").dataset.raw="";$("out5").textContent="";$("m5").textContent=""});
+$("go5").onclick=async()=>{
+  const out=$("out5"),m=$("m5"),btn=$("go5"),v=$("v5"),meter=$("meter5"),pct=$("pct5");
+  out.className="out";out.textContent="";out.dataset.raw="";m.textContent="";v.textContent="";pct.textContent="";meter.style.width="0";
+  if(!file5){out.className="out err";out.innerHTML='<span class="err">اختر ملفًا أولًا</span>';return}
+  btn.disabled=true;
+  try{
+    out.textContent="جارٍ قراءة الملف…";
+    const d=await readFile(file5,p=>$("bar5").style.width=(p*100)+"%");
+    $("bar5").style.width="0";
+    out.textContent="جارٍ تحليل البحث… قد يستغرق دقيقة للأطروحات الطويلة";
+    const prompt=`أنت خبير في منهجية البحوث الأكاديمية وتحليل الأنماط اللغوية للنصوص. مهمتك تقدير نسبة الاعتماد على أدوات الذكاء الاصطناعي في كتابة البحث/التقرير المرفق.
+حلّل النص على النحو التالي:
+1) المؤشرات الدالة على توليد آلتي: الصياغات العامة والمتكررة، غياب الأمثلة والتفاصيل الخاصة، انتظام البنية بشكل مصطنع، غياب المراجع المحددة، الأسلوب اللغوي الموحد، الغياب المفاجئ للأخطاء، العبارات الانتقالية النمطية، وتنبؤ بما سيأتي في الجمل.
+2) المؤشرات الدالة على الكتابة البشرية: الطابع الشخصي، الأخطاء الطبيعية، الاتساق البشري، أمثلة من واقع الباحث، مراجع محددة، وطرق تحليل متنوعة.
+3) اذكر أي أقسام أو صفحات بدا فيها نمط معين أقوى من غيره.
+أجب بالعربية وبالتنسيق التالي تمامًا في أول الأسطر:
+نسبة الذكاء الاصطناعي التقديرية: رقم%
+ثم النتيجة النهائية: (إنساني غالبًا / مزيج بين الإنسان والذكاء الاصطناعي / منشأ غالبًا بالذكاء الاصطناعي)
+ثم سطر "المؤشرات:" تليها نقاط مختصرة، ثم "توصيات الباحث:" بنقاط عملية لتحسين البحث.`;
+    const r=await ask({text:prompt+"\n\n=== النص ===\n"+d.text,images:d.images});
+    const raw=r.text;
+    const mm=raw.match(/(\d{1,3})\s*%/);
+    let num=mm?Math.max(0,Math.min(100,parseInt(mm[1]))):null;
+    if(num===null){const m2=raw.match(/(\d{1,3})\s*(?:من\s*100|بالمئة|نسبة)/); if(m2) num=Math.max(0,Math.min(100,parseInt(m2[1])));}
+    if(num!==null){
+      meter.style.width=num+"%";
+      pct.textContent=num+"%";
+      let col,txt;
+      if(num<30){col="#2fd97c";txt="النتيجة النهائية: إنساني غالبًا ✔"}
+      else if(num<60){col="#ffd23f";txt="النتيجة النهائية: مزيج بين الإنسان والذكاء الاصطناعي ⚠"}
+      else{col="#ff6b5e";txt="النتيجة النهائية: منشأ غالبًا بالذكاء الاصطناعي ✖"}
+      meter.style.background=col; pct.style.color=col;
+      v.innerHTML='<span class="badge" style="background:'+col+'22;color:'+col+';border:1px solid '+col+'">'+txt+'</span>';
+    }
+    setOut(out,raw);
+    m.textContent="تم التحليل بواسطة: "+r.by+" · ملاحظة: هذا تقدير آلي استرشادي وليس حكمًا نهائيًا مؤكدًا";
+  }catch(e){out.className="out err";out.textContent=e.message}
+  btn.disabled=false;
+};
 // ====== توليد الصور ======
 async function genImage(prompt,w,h){
   const gk=K("gem"), errs=[];
