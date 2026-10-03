@@ -461,7 +461,7 @@ let GEM_MODELS=["gemini-3.8-flash","gemini-3.5-flash-lite"];
 async function loadModels(){ // يجلب المودلات المتاحة فعليًا لمفتاحك، ويبقي القائمة أعلاه احتياطًا
   const k=K("gem"); if(!k&&!PROXY) return;
   try{
-    const r=await fetch((PROXY?PROXY+"/gemini":"https://generativelanguage.googleapis.com")+"/v1beta/models?pageSize=100",{headers:PROXY?{}:{"x-goog-api-key":k}});
+    const r=await tfetch((PROXY?PROXY+"/gemini":"https://generativelanguage.googleapis.com")+"/v1beta/models?pageSize=100",{headers:PROXY?{}:{"x-goog-api-key":k}},10000);
     const j=await r.json();
     const found=(j.models||[]).filter(m=>(m.supportedGenerationMethods||[]).includes("generateContent")&&/flash/.test(m.name)&&!/image|tts|live|audio|embed|robotics|computer|omni|preview|latest|exp/.test(m.name))
       .map(m=>m.name.replace("models/","")).sort().reverse().slice(0,4);
@@ -480,14 +480,21 @@ function providers(needVision){
   if((gq||PROXY)&&!needVision) list.push({name:"Groq · llama-3.3-70b",vision:false,limit:24000,run:(p)=>openai(PROXY?PROXY+"/groq/openai/v1/chat/completions":"https://api.groq.com/openai/v1/chat/completions",gq,"llama-3.3-70b-versatile",p)});
   return list;
 }
+// fetch بمهلة: يمنع بقاء الموقع معلّقًا إن لم يردّ المزوّد
+async function tfetch(url,opt,ms){
+  const c=new AbortController(), t=setTimeout(()=>c.abort(),ms||60000);
+  try{return await fetch(url,{...(opt||{}),signal:c.signal})}
+  catch(e){ if(e&&e.name==="AbortError") throw new Error("انتهت مهلة الاتصال بالمزوّد"); throw e }
+  finally{clearTimeout(t)}
+}
 async function gcall(key,model,body){
   const path=`/v1beta/models/${model}:generateContent`, b=JSON.stringify(body), H={"Content-Type":"application/json"};
   let r;
-  if(PROXY) r=await fetch(PROXY+"/gemini"+path,{method:"POST",headers:H,body:b});
+  if(PROXY) r=await tfetch(PROXY+"/gemini"+path,{method:"POST",headers:H,body:b},70000);
   else{
     const base="https://generativelanguage.googleapis.com"+path; key=key.trim();
-    r=await fetch(base,{method:"POST",headers:{...H,"x-goog-api-key":key},body:b});
-    if(r.status===401) r=await fetch(base+"?key="+encodeURIComponent(key),{method:"POST",headers:H,body:b});
+    r=await tfetch(base,{method:"POST",headers:{...H,"x-goog-api-key":key},body:b},70000);
+    if(r.status===401) r=await tfetch(base+"?key="+encodeURIComponent(key),{method:"POST",headers:H,body:b},70000);
   }
   const j=await r.json(); if(!r.ok) throw new Error(j.error?.message||r.status);
   return j;
@@ -500,8 +507,8 @@ async function gemini(key,model,{text,images,search,maxTokens}){
   return {text:t,sources};
 }
 async function openai(url,key,model,{text,maxTokens}){
-  const r=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json",...(key?{Authorization:"Bearer "+key}:{})},
-    body:JSON.stringify({model,messages:[{role:"user",content:text}],...(maxTokens?{max_tokens:Math.min(maxTokens,4096)}:{})})});
+  const r=await tfetch(url,{method:"POST",headers:{"Content-Type":"application/json",...(key?{Authorization:"Bearer "+key}:{})},
+    body:JSON.stringify({model,messages:[{role:"user",content:text}],...(maxTokens?{max_tokens:Math.min(maxTokens,4096)}:{})})},60000);
   const j=await r.json(); if(!r.ok) throw new Error(j.error?.message||r.status);
   return j.choices[0].message.content;
 }
@@ -521,7 +528,7 @@ async function ask(payload){
       return {...r,by:p.name+(payload.search&&!p.name.startsWith("Gemini")?" (بدون بحث مباشر)":"")};
     }catch(e){
       errs.push(p.name+": "+e.message);
-      if(/quota|credentials|exceeded|not found|no longer available|API key/i.test(e.message)) BAD[p.name]=Date.now()+90000;
+      if(/quota|credentials|exceeded|not found|no longer available|API key|انتهت مهلة/i.test(e.message)) BAD[p.name]=Date.now()+90000;
     }
   }
   const hint=errs.length&&errs.every(e=>/credentials/i.test(e))?"\n\nملاحظة: Google ترفض مفاتيح Gemini من نوع AQ لبعض الحسابات (مشكلة معروفة عندها). أضف مفتاح Groq أو OpenRouter من «المزوّدون» ليعمل الموقع بدونها.":"";
@@ -628,7 +635,7 @@ const oaAbs=inv=>{if(!inv)return "";const a=[];for(const [w,ps] of Object.entrie
 // الذكاء الاصطناعي يفهم السؤال ويكتب استعلامات بحث دقيقة
 async function planQueries(q){
   try{
-    const t=(await ask({text:`أنت خبير بحث. حوّل سؤال المستخدم إلى 3 استعلامات بحث قصيرة ودقيقة (3-8 كلمات): الأول بلغة السؤال، والثاني بالإنجليزية، والثالث بالإنجليزية بصياغة أكاديمية إن كان السؤال علميًا. صحّح الأخطاء الإملائية واستنتج المقصود. اكتب كل استعلام في سطر مستقل دون ترقيم أو شرح.\nالسؤال: ${q}`,maxTokens:300})).text;
+    const t=(await Promise.race([new Promise((_,rj)=>setTimeout(()=>rj(new Error("timeout")),10000)),ask({text:`أنت خبير بحث. حوّل سؤال المستخدم إلى 3 استعلامات بحث قصيرة ودقيقة (3-8 كلمات): الأول بلغة السؤال، والثاني بالإنجليزية، والثالث بالإنجليزية بصياغة أكاديمية إن كان السؤال علميًا. صحّح الأخطاء الإملائية واستنتج المقصود. اكتب كل استعلام في سطر مستقل دون ترقيم أو شرح.\nالسؤال: ${q}`,maxTokens:300})])).text;
     const qs=t.split("\n").map(x=>x.replace(/^[\s\-*•\d.)]+/,"").replace(/^["']|["']$/g,"").trim()).filter(x=>x.length>2&&x.length<140).slice(0,3);
     return qs.length?qs:[q];
   }catch(e){return [q]}
@@ -641,8 +648,4 @@ async function webContext(qs){
     const l=/[\u0600-\u06FF]/.test(q)?"ar":"en", e=encodeURIComponent(q);
     if(tk||PROXY) jobs.push((async()=>{try{
       const j=await fetchJ(PROXY?PROXY+"/tavily/search":"https://api.tavily.com/search",{method:"POST",headers:{"Content-Type":"application/json",...(tk?{Authorization:"Bearer "+tk}:{})},body:JSON.stringify({query:q,max_results:6})});
-      (j.results||[]).forEach(x=>add({title:x.title,url:x.url,content:(x.content||"").slice(0,1500)}));
-    }catch(_){}})());
-    jobs.push((async()=>{try{
-      const j=await fetchJ(`https://${l}.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${e}&gsrlimit=4&prop=extracts&exintro=1&explaintext=1&exlimit=4&format=json&origin=*`);
-      Object.values(j.query?.pages||{}).sort((a,b)=>a.index-b.index).forEach(p=>add({title:p.title+" (ويكيبيديا)",url:`https://${l}.wikipedia.org/wiki/${encodeURICompone
+      (j.results||[]).forEach(x
