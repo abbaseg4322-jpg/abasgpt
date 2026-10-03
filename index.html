@@ -117,7 +117,7 @@ details.ent .out{margin-top:8px;font-size:.93rem}
     b.appendChild(x);
     b.appendChild(document.createTextNode(errs.slice(-3).map(function(t){return "\u2022 "+t}).join("\n")));
   };
-  function pushErr(t){ t=String(t).slice(0,300); if(errs.indexOf(t)<0){ errs.push(t); if(errs.length>20) errs.shift() } window.__renderErr(); }
+  function pushErr(t){ t=String(t).slice(0,300); (window.__allErrs=window.__allErrs||[]).push(t); if(errs.indexOf(t)<0){ errs.push(t); if(errs.length>20) errs.shift() } window.__renderErr(); }
   window.addEventListener("error",function(e){ if(!e.message||/ResizeObserver|^Script error\.?$/i.test(e.message)) return; pushErr(e.message+" @ line "+e.lineno+":"+e.colno); });
   window.addEventListener("unhandledrejection",function(e){ var m=String(e.reason&&e.reason.message||e.reason); if(/AbortError|aborted|Failed to fetch|NetworkError|Load failed/i.test(m)){ e.preventDefault(); return } pushErr("Promise: "+m); });
   // احتياط: إن لم يكتمل السكربت الرئيسي يعرض الزر سبب التعطل بدل أن يفشل بصمت
@@ -267,6 +267,42 @@ details.ent .out{margin-top:8px;font-size:.93rem}
     </div>
   </form>
 </dialog>
+<script>
+/* نافذة المزوّدين: سكربت مستقل لا يتأثر بتعطّل بقية الموقع. تُقفل فور الحفظ أو الإغلاق (حماية واجهة فقط). */
+(function(){
+  var $=function(i){return document.getElementById(i)}, dlg=$("dlg"), NAMES=["gem","or","groq","tav","pol"], PIN_HASH="07d41edc545de21a114858a3ede9d13045ee5609c66999562826992b4b591291", unlocked=false;
+  function get(k){try{return localStorage.getItem(k)||""}catch(e){return ""}}
+  function put(k,v){try{localStorage.setItem(k,v)}catch(e){}}
+  function fill(){NAMES.forEach(function(n){var el=$("k_"+n); if(el) el.value=get("k_"+n)})}
+  function showKeys(){$("lockbox").hidden=unlocked;$("keysbox").hidden=!unlocked}
+  function sha(t){
+    if(!(window.crypto&&crypto.subtle)) return Promise.reject(new Error("insecure-context"));
+    return crypto.subtle.digest("SHA-256",new TextEncoder().encode(t)).then(function(d){return Array.prototype.map.call(new Uint8Array(d),function(x){return x.toString(16).padStart(2,"0")}).join("")});
+  }
+  window.openKeys=function(){
+    unlocked=false; fill(); $("pin").value=""; $("pinerr").textContent=""; showKeys();
+    try{ if(dlg&&!dlg.open){ if(dlg.showModal) dlg.showModal(); else dlg.setAttribute("open","") } }catch(e){ dlg.setAttribute("open","") }
+  };
+  function tryUnlock(){
+    var btn=$("unlock"); btn.disabled=true; $("pinerr").textContent="";
+    sha($("pin").value).then(function(h){
+      if(h===PIN_HASH){unlocked=true;showKeys()} else $("pinerr").textContent="الرمز غير صحيح";
+    }).catch(function(e){
+      $("pinerr").textContent=/insecure/.test(e.message)?"هذا الرابط غير آمن (يتطلب HTTPS) فلا يستطيع المتصفح التحقق من الرمز. افتح الموقع عبر https وأعد المحاولة.":"تعذّر التحقق: "+(e&&e.message||e);
+    }).then(function(){btn.disabled=false});
+  }
+  $("unlock").onclick=tryUnlock;
+  $("pin").addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();tryUnlock()}});
+  $("save").onclick=function(){
+    NAMES.forEach(function(n){put("k_"+n,$("k_"+n).value.trim())});
+    try{ if(window.__onKeysSaved) window.__onKeysSaved() }catch(e){ console.error(e) }
+  };
+  // فور الحفظ أو الإغلاق: تُقفل النافذة من جديد دون إعادة تحميل الصفحة
+  dlg.addEventListener("close",function(){ unlocked=false; fill(); $("pin").value=""; $("pinerr").textContent=""; showKeys(); });
+  fill(); showKeys();
+})();
+</script>
+
 
 <script>
 /* ============================================================
@@ -300,30 +336,6 @@ const K=n=>(store.get("k_"+n)||(n==="gem"?GEMINI_KEY:SHARED[n])||"").trim();
 // شاشة الترحيب: ثانيتان ثم تختفي ويبقى الشعار في الأعلى
 try{sessionStorage.removeItem("noSplash")}catch(e){}
 
-// قفل خانة المزوّدين (حماية واجهة فقط، وليست حماية خادم)
-const PIN_HASH="07d41edc545de21a114858a3ede9d13045ee5609c66999562826992b4b591291";
-let unlocked=false;
-async function sha(t){if(!(window.crypto&&crypto.subtle))throw new Error("insecure-context");const d=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(t));return [...new Uint8Array(d)].map(x=>x.toString(16).padStart(2,"0")).join("")}
-function showKeys(){$("lockbox").hidden=unlocked;$("keysbox").hidden=!unlocked}
-function openKeys(){$("pin").value="";$("pinerr").textContent="";showKeys();if(dlg&&!dlg.open)dlg.showModal()}
-window.openKeys=openKeys;
-async function tryUnlock(){
-  const btn=$("unlock"); btn.disabled=true; $("pinerr").textContent="";
-  try{
-    if(!(window.crypto&&crypto.subtle)){$("pinerr").textContent="هذا الرابط غير آمن (يتطلب HTTPS) فلا يستطيع المتصفح التحقق من الرمز. افتح الموقع عبر https وأعد المحاولة.";return}
-    if((await sha($("pin").value))===PIN_HASH){unlocked=true;showKeys()} else $("pinerr").textContent="الرمز غير صحيح";
-  }catch(e){$("pinerr").textContent="تعذّر التحقق: "+(e&&e.message||e)}
-  finally{btn.disabled=false}
-}
-$("unlock").onclick=tryUnlock;
-$("pin").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();tryUnlock()}});
-// عند الحفظ أو الإغلاق: يعود القفل دون إعادة تحميل الصفحة، فلا تضيع النتائج المعروضة
-let savedFlag=false;
-dlg.addEventListener("close",()=>{
-  unlocked=false; try{sessionStorage.removeItem("abf_unlocked")}catch(e){} $("pin").value=""; $("pinerr").textContent=""; showKeys();
-  if(savedFlag){savedFlag=false}else{["gem","or","groq","tav","pol"].forEach(n=>$("k_"+n).value=store.get("k_"+n))}
-});
-
 // عرض منسّق: يحمي الكود البرمجي (اتجاه يسار، خط ثابت) ويهرّب HTML
 const esc=x=>x.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 function md(t){
@@ -343,9 +355,8 @@ function showHint(){$("hint").hidden=!!(PROXY||K("gem")||K("groq")||K("or"))}
 showHint();
 // تبويبات
 
-// إعدادات
-["gem","or","groq","tav","pol"].forEach(n=>$("k_"+n).value=store.get("k_"+n));
-$("save").onclick=()=>{["gem","or","groq","tav","pol"].forEach(n=>store.set("k_"+n,$("k_"+n).value.trim()));savedFlag=true;window.IMG_SKIP=false;window.IMG_BAD={};Object.keys(BAD).forEach(k=>delete BAD[k]);loadModels();showHint()};
+// حفظ المفاتيح وفتح النافذة في سكربت مستقل؛ هذا الخطّاف يُستدعى بعد الحفظ
+window.__onKeysSaved=()=>{window.IMG_SKIP=false;window.IMG_BAD={};Object.keys(BAD).forEach(k=>delete BAD[k]);loadModels();showHint()};
 
 /* ============================================================
    2. أدوات مشتركة
@@ -639,13 +650,4 @@ $("f6").onchange=async()=>{
       if(inc.assessment&&(!SESSION.assessment||inc.assessment.at>SESSION.assessment.at)) SESSION.assessment=inc.assessment;
       SESSION.knowledge=[...new Set([...SESSION.knowledge,...inc.knowledge])].slice(-40);
     } else SESSION=inc;
-    saveSession(); fillProfile(); renderSession(); m.textContent="تم تحميل السجل: "+SESSION.entries.length+" نشاطًا. يمكنك الآن الضغط على «قيّم مستواي ومرحلتي».";
-  }catch(e){m.className="meta err";m.textContent="تعذّر رفع السجل: "+e.message}
-};
-$("clr6").onclick=()=>{
-  if(!confirm("سيُمسح السجل الحالي كاملًا. هل نزّلت نسخة منه؟ المتابعة؟")) return;
-  SESSION=newSession(); saveSession(); fillProfile(); renderSession(); $("m6").textContent="";
-};
-$("assess6").onclick=async()=>{
-  const m=$("m6"),btn=$("assess6"); m.className="meta"; m.textContent="";
-  if(!SESSION.entries.length&&!SESSION.profile.title){m.className="meta err";m.textContent="لا توجد أنشطة ولا تفاصيل بعد. استخدم الموقع أو 
+    saveSession(); fillProfile(); renderSession(); m.textContent="تم تحميل السجل: "+SESSION.entries.length
