@@ -65,10 +65,9 @@ dialog label{display:block;font-weight:700;margin:12px 0 4px}
 .verdict{text-align:center;font-size:1.15rem;font-weight:700;margin-top:4px}
 .badge{display:inline-block;padding:2px 10px;border-radius:20px;font-size:.85rem;font-weight:700}
 
-.tabs{overflow-x:auto;scrollbar-width:none}
-.tabs::-webkit-scrollbar{display:none}
-.tabs button{flex:1 0 auto;white-space:nowrap;padding:9px 14px}
-@media(max-width:480px){.tabs button{padding:8px 11px}}
+.tabs{flex-wrap:wrap}
+.tabs button{flex:1 1 30%;padding:9px 6px;white-space:nowrap}
+@media(min-width:620px){.tabs button{flex:1 1 0}}
 .card2{background:var(--field);border:1px solid var(--line);border-radius:12px;padding:12px;margin-top:10px}
 .card2 label{display:block;font-weight:700;font-size:.9rem;margin:10px 0 4px;color:var(--mut)}
 .card2 label:first-of-type{margin-top:6px}
@@ -99,6 +98,14 @@ details.ent .out{margin-top:8px;font-size:.93rem}
   try{skip=sessionStorage.getItem("noSplash")==="1"}catch(e){}
   function gone(){ if(sp&&sp.parentNode) sp.parentNode.removeChild(sp) }
   if(skip) gone(); else { setTimeout(function(){ if(sp) sp.classList.add("hide"); setTimeout(gone,600) },2000); setTimeout(gone,6000) }
+  document.addEventListener("click",function(e){
+    var b=e.target&&e.target.closest?e.target.closest(".tabs button"):null;
+    if(!b||!b.getAttribute("data-t")) return;
+    var all=document.querySelectorAll(".tabs button,.panel");
+    for(var i=0;i<all.length;i++) all[i].classList.remove("on");
+    b.classList.add("on");
+    var pn=document.getElementById(b.getAttribute("data-t")); if(pn) pn.classList.add("on");
+  });
   window.addEventListener("error",function(e){
     if(!e.message) return;
     var b=document.getElementById("errbar");
@@ -252,6 +259,10 @@ details.ent .out{margin-top:8px;font-size:.93rem}
 </dialog>
 
 <script>
+/* ============================================================
+   1. النواة: الإعدادات والمفاتيح وأدوات العرض والنوافذ
+   ============================================================ */
+
 (function(){
 /* ====== المفاتيح المشتركة لكل زوّار الموقع ======
    ضع المفتاح بين علامتي الاقتباس. سيراه أي شخص يفتح كود الموقع، فاستخدم مفتاحًا مخصصًا لهذا الموقع فقط.
@@ -311,14 +322,26 @@ async function copy(text,btn){
 function showHint(){$("hint").hidden=!!(PROXY||K("gem")||K("groq")||K("or"))}
 showHint();
 // تبويبات
-document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>{
-  document.querySelectorAll(".tabs button,.panel").forEach(x=>x.classList.remove("on"));
-  b.classList.add("on"); $(b.dataset.t).classList.add("on");
-});
+
 // إعدادات
 ["gem","or","groq","tav","pol"].forEach(n=>$("k_"+n).value=store.get("k_"+n));
 $("save").onclick=()=>{["gem","or","groq","tav","pol"].forEach(n=>store.set("k_"+n,$("k_"+n).value.trim()));window.IMG_SKIP=false;loadModels();showHint()};
 
+/* ============================================================
+   2. أدوات مشتركة
+   ============================================================ */
+// منطقة السحب والإفلات وزر اختيار الملف (تستخدمها كل الصفحات)
+function drop(zone,input,cb){
+  zone.onclick=()=>input.click();
+  zone.onkeydown=e=>{if(e.key==="Enter")input.click()};
+  input.onchange=()=>input.files[0]&&cb(input.files[0]);
+  zone.ondragover=e=>{e.preventDefault();zone.classList.add("hv")};
+  zone.ondragleave=()=>zone.classList.remove("hv");
+  zone.ondrop=e=>{e.preventDefault();zone.classList.remove("hv");e.dataTransfer.files[0]&&cb(e.dataTransfer.files[0])};
+}
+/* ============================================================
+   3. خدمة سجل الجلسة: البيانات والحفظ والذاكرة (يستخدمها بقية الموقع)
+   ============================================================ */
 // ====== سجل الجلسة ======
 const STAGES=["اختيار الموضوع","مراجعة الأدبيات","الإطار والمنهجية","جمع البيانات","التحليل والنتائج","الكتابة والصياغة","المراجعة والنشر"];
 const TYPES={file:"📄 ملف",ocr:"✍️ نص من صورة",search:"🔎 بحث",image:"🖼️ صورة",ai:"🧪 فحص أسلوب ومضمون"};
@@ -407,68 +430,9 @@ function renderSession(){
   });
 }
 function fillProfile(){$("pf_title").value=SESSION.profile.title;$("pf_field").value=SESSION.profile.field;$("pf_goal").value=SESSION.profile.goal}
-[["pf_title","title"],["pf_field","field"],["pf_goal","goal"]].forEach(([id,k])=>$(id).addEventListener("input",()=>{SESSION.profile[k]=$(id).value.trim();saveSession()}));
-function dlBlob(name,text,type){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),4000)}
-const stamp=()=>new Date().toISOString().slice(0,16).replace(/[:T]/g,"-");
-$("dl6").onclick=()=>{saveSession();dlBlob("abf-session-"+stamp()+".json",JSON.stringify(SESSION,null,1),"application/json")};
-$("rp6").onclick=()=>{
-  const p=SESSION.profile,a=SESSION.assessment;
-  let t=`تقرير جلسة البحث · ${new Date().toLocaleString("ar")}\nالموضوع: ${p.title||"-"}\nالتخصص: ${p.field||"-"}\nالهدف: ${p.goal||"-"}\n`;
-  if(a) t+=`\nالمرحلة: ${a.stage} (${a.stageIdx}/7) · المستوى: ${a.level} · التقدم: ${a.progress}%\n${a.summary}\n`+
-    ["strengths","gaps","next_steps"].map((k,i)=>a[k].length?`\n${["نقاط القوة","الفجوات","الخطوات القادمة"][i]}:\n`+a[k].map(x=>"- "+x).join("\n"):"").join("")+"\n";
-  if(SESSION.knowledge.length) t+="\nالمعارف المكتسبة:\n"+SESSION.knowledge.map(x=>"- "+x).join("\n")+"\n";
-  t+="\n====== الأنشطة ======\n"+SESSION.entries.map(e=>`\n[${new Date(e.t).toLocaleString("ar")}] ${TYPES[e.type]} · ${e.title}\n${e.input?"المدخل: "+e.input+"\n":""}${e.result}\n`+(e.sources.length?"المصادر:\n"+e.sources.map(x=>"  "+x.title+" "+x.uri).join("\n")+"\n":"")).join("\n");
-  dlBlob("abf-report-"+stamp()+".txt",t,"text/plain;charset=utf-8");
-};
-$("up6").onclick=()=>$("f6").click();
-$("f6").onchange=async()=>{
-  const f=$("f6").files[0]; $("f6").value=""; if(!f) return; const m=$("m6"); m.className="meta";
-  try{
-    const j=JSON.parse(await f.text()); if(!j||j.app!=="abf-ai-session"||!Array.isArray(j.entries)) throw new Error("ملف غير صالح");
-    const inc=normSession(j);
-    if(SESSION.entries.length&&!confirm("يوجد سجل حالي. موافق = دمج السجل المرفوع معه، إلغاء = استبدال الحالي بالمرفوع.")) SESSION=inc;
-    else if(SESSION.entries.length){
-      const ids=new Set(SESSION.entries.map(e=>e.id));
-      SESSION.entries=[...SESSION.entries,...inc.entries.filter(e=>!ids.has(e.id))].sort((x,y)=>x.t<y.t?-1:1).slice(-300);
-      const P=SESSION.profile; ["title","field","goal"].forEach(k=>{if(!P[k]) P[k]=inc.profile[k]});
-      if(inc.assessment&&(!SESSION.assessment||inc.assessment.at>SESSION.assessment.at)) SESSION.assessment=inc.assessment;
-      SESSION.knowledge=[...new Set([...SESSION.knowledge,...inc.knowledge])].slice(-40);
-    } else SESSION=inc;
-    saveSession(); fillProfile(); renderSession(); m.textContent="تم تحميل السجل: "+SESSION.entries.length+" نشاطًا. يمكنك الآن الضغط على «قيّم مستواي ومرحلتي».";
-  }catch(e){m.className="meta err";m.textContent="تعذّر رفع السجل: "+e.message}
-};
-$("clr6").onclick=()=>{
-  if(!confirm("سيُمسح السجل الحالي كاملًا. هل نزّلت نسخة منه؟ المتابعة؟")) return;
-  SESSION=newSession(); saveSession(); fillProfile(); renderSession(); $("m6").textContent="";
-};
-$("assess6").onclick=async()=>{
-  const m=$("m6"),btn=$("assess6"); m.className="meta"; m.textContent="";
-  if(!SESSION.entries.length&&!SESSION.profile.title){m.className="meta err";m.textContent="لا توجد أنشطة ولا تفاصيل بعد. استخدم الموقع أو أضف عنوان بحثك أولًا.";return}
-  btn.disabled=true; m.textContent="الذكاء الاصطناعي يحلّل مسيرتك البحثية…";
-  try{
-    const p=SESSION.profile;
-    const log=SESSION.entries.slice(-30).map((e,i)=>`#${i+1} [${e.t.slice(0,16)}] ${TYPES[e.type]} | ${e.title}\nالمدخل: ${e.input.slice(0,300)}\nالنتيجة: ${e.result.slice(0,600).replace(/\s+/g," ")}`+(e.scores?`\nدرجات الفحص: أسلوب ${e.scores.style}% مضمون ${e.scores.content}%`:"")).join("\n\n");
-    const prompt=`أنت مشرف أكاديمي خبير. قيّم مدى تقدّم الباحث ومستواه العلمي اعتمادًا على سجل نشاطه فقط، دون مبالغة ودون اختراع.
-المراحل (رقّمها): ${STAGES.map((x,i)=>(i+1)+"="+x).join("، ")}.
-بيانات الباحث: العنوان: ${p.title||"غير محدد"} | التخصص: ${p.field||"غير محدد"} | الهدف: ${p.goal||"غير محدد"}
-${SESSION.assessment?"تقييمه السابق: المرحلة "+SESSION.assessment.stageIdx+" وتقدمه "+SESSION.assessment.progress+"%\n":""}
-=== سجل النشاط ===
-${log||"(لا أنشطة)"}
-
-أرجع JSON صالحًا فقط، دون أي نص قبله أو بعده ودون علامات \`\`\`، بهذا الشكل:
-{"stage":رقم من 1 إلى 7,"progress":رقم من 0 إلى 100 يمثل التقدم الكلي في رحلة البحث,"level":"مبتدئ أو متوسط أو متقدم","summary":"تقييم من 2-3 جمل لما وصل إليه","strengths":["..."],"gaps":["..."],"next_steps":["خطوات عملية محددة"],"knowledge":["3 إلى 8 معارف أو مفاهيم رئيسية اكتسبها الباحث من نشاطه"]}
-اكتب القيم النصية بالعربية.`;
-    const r=await ask({text:prompt,maxTokens:2048});
-    const j=extractJSON(r.text);
-    if(!j){m.className="meta err";setOut($("out6"),r.text);m.textContent="تعذّر قراءة التقييم بصيغته المنظمة، هذا نصه الخام.";btn.disabled=false;return}
-    SESSION.assessment=normAssess({...j,stageIdx:j.stage,at:new Date().toISOString()});
-    SESSION.knowledge=[...new Set([...SESSION.knowledge,...strs(j.knowledge)])].slice(-40);
-    saveSession(); renderSession(); m.textContent="تم التقييم بواسطة: "+r.by+" · هذا تقدير استرشادي مبني على ما سُجّل في الجلسة فقط";
-  }catch(e){m.className="meta err";m.textContent=e.message}
-  btn.disabled=false;
-};
-fillProfile(); renderSession();
-
+/* ============================================================
+   4. الموجّه: المزوّدون والمودلات والتعامل مع الأخطاء والمهل
+   ============================================================ */
 // ====== الموجّه: تسلسل المزوّدين والمودلات ======
 let IMG_MODELS=["gemini-2.5-flash-image"];
 let GEM_MODELS=["gemini-3.8-flash","gemini-3.5-flash-lite"];
@@ -485,7 +449,6 @@ async function loadModels(){ // يجلب المودلات المتاحة فعل�
     IMG_MODELS=[...new Set([...imgs,...IMG_MODELS])];
   }catch(e){}
 }
-loadModels();
 function providers(needVision){
   const list=[], gk=K("gem");
   if(gk||PROXY) GEM_MODELS.forEach(m=>list.push({name:"Gemini · "+m,vision:true,limit:300000,run:(p)=>withKeys(k=>gemini(k,m,p))}));
@@ -549,6 +512,9 @@ async function ask(payload){
   throw new Error(errs.length?errs.map(e=>e.length>150?e.slice(0,150)+"…":e).join("\n")+hint:"لا يوجد مفتاح. اضغط «المزوّدون» وأضف مفتاح Gemini");
 }
 
+/* ============================================================
+   5. قراءة الملفات
+   ============================================================ */
 // ====== قراءة الملفات ======
 const need=(ok,name)=>{if(!ok)throw new Error("تعذّر تحميل مكتبة "+name+"، تحقق من الاتصال بالإنترنت")};
 const b64=buf=>{let s="",b=new Uint8Array(buf);for(let i=0;i<b.length;i+=8192)s+=String.fromCharCode.apply(null,b.subarray(i,i+8192));return btoa(s)};
@@ -589,16 +555,76 @@ async function readFile(f,prog){
   throw new Error("نوع الملف غير مدعوم");
 }
 
+/* ============================================================
+   6. الصفحات: لكل صفحة وحدة مستقلة تُشغَّل وحدها، فتعطّل واحدة لا يعطّل الباقي
+   ============================================================ */
+// واجهة سجل الجلسة
+function initSessionUI(){
+[["pf_title","title"],["pf_field","field"],["pf_goal","goal"]].forEach(([id,k])=>$(id).addEventListener("input",()=>{SESSION.profile[k]=$(id).value.trim();saveSession()}));
+function dlBlob(name,text,type){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),4000)}
+const stamp=()=>new Date().toISOString().slice(0,16).replace(/[:T]/g,"-");
+$("dl6").onclick=()=>{saveSession();dlBlob("abf-session-"+stamp()+".json",JSON.stringify(SESSION,null,1),"application/json")};
+$("rp6").onclick=()=>{
+  const p=SESSION.profile,a=SESSION.assessment;
+  let t=`تقرير جلسة البحث · ${new Date().toLocaleString("ar")}\nالموضوع: ${p.title||"-"}\nالتخصص: ${p.field||"-"}\nالهدف: ${p.goal||"-"}\n`;
+  if(a) t+=`\nالمرحلة: ${a.stage} (${a.stageIdx}/7) · المستوى: ${a.level} · التقدم: ${a.progress}%\n${a.summary}\n`+
+    ["strengths","gaps","next_steps"].map((k,i)=>a[k].length?`\n${["نقاط القوة","الفجوات","الخطوات القادمة"][i]}:\n`+a[k].map(x=>"- "+x).join("\n"):"").join("")+"\n";
+  if(SESSION.knowledge.length) t+="\nالمعارف المكتسبة:\n"+SESSION.knowledge.map(x=>"- "+x).join("\n")+"\n";
+  t+="\n====== الأنشطة ======\n"+SESSION.entries.map(e=>`\n[${new Date(e.t).toLocaleString("ar")}] ${TYPES[e.type]} · ${e.title}\n${e.input?"المدخل: "+e.input+"\n":""}${e.result}\n`+(e.sources.length?"المصادر:\n"+e.sources.map(x=>"  "+x.title+" "+x.uri).join("\n")+"\n":"")).join("\n");
+  dlBlob("abf-report-"+stamp()+".txt",t,"text/plain;charset=utf-8");
+};
+$("up6").onclick=()=>$("f6").click();
+$("f6").onchange=async()=>{
+  const f=$("f6").files[0]; $("f6").value=""; if(!f) return; const m=$("m6"); m.className="meta";
+  try{
+    const j=JSON.parse(await f.text()); if(!j||j.app!=="abf-ai-session"||!Array.isArray(j.entries)) throw new Error("ملف غير صالح");
+    const inc=normSession(j);
+    if(SESSION.entries.length&&!confirm("يوجد سجل حالي. موافق = دمج السجل المرفوع معه، إلغاء = استبدال الحالي بالمرفوع.")) SESSION=inc;
+    else if(SESSION.entries.length){
+      const ids=new Set(SESSION.entries.map(e=>e.id));
+      SESSION.entries=[...SESSION.entries,...inc.entries.filter(e=>!ids.has(e.id))].sort((x,y)=>x.t<y.t?-1:1).slice(-300);
+      const P=SESSION.profile; ["title","field","goal"].forEach(k=>{if(!P[k]) P[k]=inc.profile[k]});
+      if(inc.assessment&&(!SESSION.assessment||inc.assessment.at>SESSION.assessment.at)) SESSION.assessment=inc.assessment;
+      SESSION.knowledge=[...new Set([...SESSION.knowledge,...inc.knowledge])].slice(-40);
+    } else SESSION=inc;
+    saveSession(); fillProfile(); renderSession(); m.textContent="تم تحميل السجل: "+SESSION.entries.length+" نشاطًا. يمكنك الآن الضغط على «قيّم مستواي ومرحلتي».";
+  }catch(e){m.className="meta err";m.textContent="تعذّر رفع السجل: "+e.message}
+};
+$("clr6").onclick=()=>{
+  if(!confirm("سيُمسح السجل الحالي كاملًا. هل نزّلت نسخة منه؟ المتابعة؟")) return;
+  SESSION=newSession(); saveSession(); fillProfile(); renderSession(); $("m6").textContent="";
+};
+$("assess6").onclick=async()=>{
+  const m=$("m6"),btn=$("assess6"); m.className="meta"; m.textContent="";
+  if(!SESSION.entries.length&&!SESSION.profile.title){m.className="meta err";m.textContent="لا توجد أنشطة ولا تفاصيل بعد. استخدم الموقع أو أضف عنوان بحثك أولًا.";return}
+  btn.disabled=true; m.textContent="الذكاء الاصطناعي يحلّل مسيرتك البحثية…";
+  try{
+    const p=SESSION.profile;
+    const log=SESSION.entries.slice(-30).map((e,i)=>`#${i+1} [${e.t.slice(0,16)}] ${TYPES[e.type]} | ${e.title}\nالمدخل: ${e.input.slice(0,300)}\nالنتيجة: ${e.result.slice(0,600).replace(/\s+/g," ")}`+(e.scores?`\nدرجات الفحص: أسلوب ${e.scores.style}% مضمون ${e.scores.content}%`:"")).join("\n\n");
+    const prompt=`أنت مشرف أكاديمي خبير. قيّم مدى تقدّم الباحث ومستواه العلمي اعتمادًا على سجل نشاطه فقط، دون مبالغة ودون اختراع.
+المراحل (رقّمها): ${STAGES.map((x,i)=>(i+1)+"="+x).join("، ")}.
+بيانات الباحث: العنوان: ${p.title||"غير محدد"} | التخصص: ${p.field||"غير محدد"} | الهدف: ${p.goal||"غير محدد"}
+${SESSION.assessment?"تقييمه السابق: المرحلة "+SESSION.assessment.stageIdx+" وتقدمه "+SESSION.assessment.progress+"%\n":""}
+=== سجل النشاط ===
+${log||"(لا أنشطة)"}
+
+أرجع JSON صالحًا فقط، دون أي نص قبله أو بعده ودون علامات \`\`\`، بهذا الشكل:
+{"stage":رقم من 1 إلى 7,"progress":رقم من 0 إلى 100 يمثل التقدم الكلي في رحلة البحث,"level":"مبتدئ أو متوسط أو متقدم","summary":"تقييم من 2-3 جمل لما وصل إليه","strengths":["..."],"gaps":["..."],"next_steps":["خطوات عملية محددة"],"knowledge":["3 إلى 8 معارف أو مفاهيم رئيسية اكتسبها الباحث من نشاطه"]}
+اكتب القيم النصية بالعربية.`;
+    const r=await ask({text:prompt,maxTokens:2048});
+    const j=extractJSON(r.text);
+    if(!j){m.className="meta err";setOut($("out6"),r.text);m.textContent="تعذّر قراءة التقييم بصيغته المنظمة، هذا نصه الخام.";btn.disabled=false;return}
+    SESSION.assessment=normAssess({...j,stageIdx:j.stage,at:new Date().toISOString()});
+    SESSION.knowledge=[...new Set([...SESSION.knowledge,...strs(j.knowledge)])].slice(-40);
+    saveSession(); renderSession(); m.textContent="تم التقييم بواسطة: "+r.by+" · هذا تقدير استرشادي مبني على ما سُجّل في الجلسة فقط";
+  }catch(e){m.className="meta err";m.textContent=e.message}
+  btn.disabled=false;
+};
+}
+// الصفحة 1: الملفات
+function initFiles(){
 // ====== الصفحة الأولى ======
 let file1=null;
-function drop(zone,input,cb){
-  zone.onclick=()=>input.click();
-  zone.onkeydown=e=>{if(e.key==="Enter")input.click()};
-  input.onchange=()=>input.files[0]&&cb(input.files[0]);
-  zone.ondragover=e=>{e.preventDefault();zone.classList.add("hv")};
-  zone.ondragleave=()=>zone.classList.remove("hv");
-  zone.ondrop=e=>{e.preventDefault();zone.classList.remove("hv");e.dataTransfer.files[0]&&cb(e.dataTransfer.files[0])};
-}
 drop($("drop"),$("f1"),f=>{file1=f;$("fname").textContent="📎 "+f.name});
 $("go1").onclick=async()=>{
   const out=$("out1"),m=$("m1"),btn=$("go1"); out.className="out";out.textContent="";out.dataset.raw="";m.textContent="";
@@ -622,6 +648,9 @@ $("go1").onclick=async()=>{
 };
 $("cp1").onclick=()=>copy($("out1").dataset.raw||$("out1").textContent,$("cp1"));
 
+}
+// الصفحة 2: نص من صورة
+function initOCR(){
 // ====== الصفحة الثانية: خط اليد ======
 let file2=null;
 drop($("drop2"),$("f2"),f=>{file2=f;$("prev").src=URL.createObjectURL(f);$("prev").hidden=false});
@@ -634,20 +663,4 @@ $("go2").onclick=async()=>{
       images:[{mime:file2.type,data:await fileB64(file2)}]});
     $("out2").value=r.text; m.textContent="تمت المعالجة بواسطة: "+r.by;
     logEntry("ocr","استخراج نص · "+file2.name,"",r.text,{by:r.by});
-  }catch(e){$("out2").value="";m.innerHTML='<span class="err"></span>';m.firstChild.textContent=e.message}
-  btn.disabled=false;
-};
-$("cp2").onclick=()=>copy($("out2").value,$("cp2"));
-$("dl2").onclick=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([$("out2").value],{type:"text/plain;charset=utf-8"}));a.download="extracted.txt";a.click()};
-
-// ====== البحث بالذكاء الاصطناعي ======
-async function fetchJ(u,opt,ms){
-  const c=new AbortController(), t=setTimeout(()=>c.abort(),ms||12000);
-  try{const r=await fetch(u,{...(opt||{}),signal:c.signal}); if(!r.ok) throw new Error(r.status); return await r.json()} finally{clearTimeout(t)}
-}
-const oaAbs=inv=>{if(!inv)return "";const a=[];for(const [w,ps] of Object.entries(inv))ps.forEach(p=>a[p]=w);return a.filter(Boolean).join(" ")};
-// الذكاء الاصطناعي يفهم السؤال ويكتب استعلامات بحث دقيقة
-async function planQueries(q){
-  try{
-    const t=(await Promise.race([new Promise((_,rj)=>setTimeout(()=>rj(new Error("timeout")),10000)),ask({text:`أنت خبير بحث. حوّل سؤال المستخدم إلى 3 استعلامات بحث قصيرة ودقيقة (3-8 كلمات): الأول بلغة السؤال، والثاني بالإنجليزية، والثالث بالإنجليزية بصياغة أكاديمية إن كان السؤال علميًا. صحّح الأخطاء الإملائية واستنتج المقصود. اكتب كل استعلام في سطر مستقل دون ترقيم أو شرح.\nالسؤال: ${q}`,maxTokens:300})])).text;
-    const qs=t.split("\n").map(x=>x.replace(/^[\s\-*•\d.)]+/,"").replace(/^["']|["']$/g,"").trim()).filter(x=>x.length>2&&x.length<1
+  }catch(e){$("out2").value="";m.innerHTML='<span class="err"></span>';m.fir
