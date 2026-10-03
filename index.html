@@ -64,6 +64,30 @@ dialog label{display:block;font-weight:700;margin:12px 0 4px}
 .pct{font-size:1.7rem;font-weight:800;text-align:center}
 .verdict{text-align:center;font-size:1.15rem;font-weight:700;margin-top:4px}
 .badge{display:inline-block;padding:2px 10px;border-radius:20px;font-size:.85rem;font-weight:700}
+
+.tabs{overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tabs button{flex:1 0 auto;white-space:nowrap;padding:9px 14px}
+@media(max-width:480px){.tabs button{padding:8px 11px}}
+.card2{background:var(--field);border:1px solid var(--line);border-radius:12px;padding:12px;margin-top:10px}
+.card2 label{display:block;font-weight:700;font-size:.9rem;margin:10px 0 4px;color:var(--mut)}
+.card2 label:first-of-type{margin-top:6px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:4px 0 6px}
+.stat{background:var(--field);border:1px solid var(--line);border-radius:12px;padding:8px 4px;text-align:center;font-size:.82rem;color:var(--mut)}
+.stat b{display:block;font-size:1.4rem;color:var(--acc);line-height:1.2}
+.stages{display:flex;gap:4px;margin:14px 0 6px}
+.stage{flex:1;height:8px;border-radius:4px;background:var(--field);border:1px solid var(--line)}
+.stage.done{background:var(--acc);border-color:var(--acc)}
+.stage.cur{background:var(--btn);border-color:var(--acc);box-shadow:0 0 8px #19c3ff88}
+details.ent{background:var(--field);border:1px solid var(--line);border-radius:10px;padding:8px 12px;margin-top:8px}
+details.ent summary{cursor:pointer;font-weight:700}
+details.ent summary small{color:var(--mut);font-weight:400}
+details.ent .out{margin-top:8px;font-size:.93rem}
+.mrow{margin:12px 0}
+.mrow .h{display:flex;justify-content:space-between;font-weight:700}
+.mrow .n{font-size:.82rem;color:var(--mut);margin-top:2px}
+.mrow .meterwrap{margin:6px 0 2px}
+.mrow .meter{transition:none}
 </style>
 </head>
 <body>
@@ -80,6 +104,7 @@ dialog label{display:block;font-weight:700;margin:12px 0 4px}
   <button data-t="p3">بحث</button>
   <button data-t="p4">صور</button>
   <button data-t="p5">أساليب البحوث</button>
+  <button data-t="p6">سجل الجلسة</button>
 </div>
 
 <section class="panel on" id="p1">
@@ -137,19 +162,50 @@ dialog label{display:block;font-weight:700;margin:12px 0 4px}
 </section>
 
 <section class="panel" id="p5">
+  <div class="meta" style="margin:0 0 10px">يفحص الموقع الأسلوب والمضمون معًا: الأفكار والحجج والمراجع والأرقام والعمق التحليلي والإضافة العلمية، وليس الشكل اللغوي فقط.</div>
   <div class="drop" id="drop5" tabindex="0">
     <b>ارفع الأطروحة أو التقرير هنا</b>
     PDF ، Word ، أو صورة مسح ضوئي للبحث
   </div>
   <input type="file" id="f5" hidden accept=".pdf,.docx,image/*">
   <div class="file" id="fname5"></div>
-  <div class="row"><button class="pri" id="go5">تحليل نسبة الذكاء الاصطناعي</button></div>
+  <div class="row"><button class="pri" id="go5">تحليل الأسلوب والمضمون</button></div>
   <div class="bar" id="bar5"></div>
   <div class="verdict" id="v5"></div>
-  <div class="meterwrap"><div class="meter" id="meter5"></div></div>
-  <div class="pct" id="pct5"></div>
+  <div id="res5"></div>
   <div class="out" id="out5"></div>
   <div class="meta" id="m5"></div>
+</section>
+
+<section class="panel" id="p6">
+  <div class="meta" style="margin:0 0 10px">سجل مؤقت يحفظ تفاصيل بحثك ونتائجك أثناء الجلسة، ويبقى ما دام التبويب مفتوحًا. نزّله للاحتفاظ به، وأعد رفعه في أي جلسة لاحقة لتكمل من حيث توقفت.</div>
+  <div class="stats" id="stats6"></div>
+  <div class="card2">
+    <b>تفاصيل بحثك</b>
+    <label for="pf_title">عنوان البحث أو موضوعه</label>
+    <input type="text" id="pf_title" maxlength="300">
+    <label for="pf_field">التخصص</label>
+    <input type="text" id="pf_field" maxlength="200">
+    <label for="pf_goal">هدفك الحالي</label>
+    <input type="text" id="pf_goal" maxlength="300">
+  </div>
+  <label style="display:flex;align-items:center;gap:8px;margin:12px 0 0"><input type="checkbox" id="memon" checked> يستفيد الموقع من سجلك في إجاباته ليبني على ما تعلّمته سابقًا</label>
+  <div class="row">
+    <button class="pri" id="assess6">قيّم مستواي ومرحلتي</button>
+    <button class="sec" id="dl6">تنزيل السجل</button>
+    <button class="sec" id="rp6">تقرير TXT</button>
+    <button class="sec" id="up6">رفع سجل</button>
+    <button class="sec" id="clr6">مسح</button>
+  </div>
+  <input type="file" id="f6" hidden accept=".json,application/json">
+  <div class="stages" id="stages6"></div>
+  <div class="verdict" id="stagename6" style="font-size:1rem"></div>
+  <div class="meterwrap"><div class="meter" id="meter6"></div></div>
+  <div class="pct" id="pct6"></div>
+  <div class="out" id="out6"></div>
+  <div class="meta" id="m6"></div>
+  <h3 style="margin:18px 0 0">الأنشطة المسجلة</h3>
+  <div id="list6"></div>
 </section>
 <footer class="meta" style="text-align:center;margin:18px 0 6px">abf ai · تطوير الإعلامي عباس بركات فرحان</footer>
 </div>
@@ -249,6 +305,156 @@ document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>{
 ["gem","or","groq","tav","pol"].forEach(n=>$("k_"+n).value=store.get("k_"+n));
 $("save").onclick=()=>{["gem","or","groq","tav","pol"].forEach(n=>store.set("k_"+n,$("k_"+n).value.trim()));window.IMG_SKIP=false;loadModels();showHint()};
 
+// ====== سجل الجلسة ======
+const STAGES=["اختيار الموضوع","مراجعة الأدبيات","الإطار والمنهجية","جمع البيانات","التحليل والنتائج","الكتابة والصياغة","المراجعة والنشر"];
+const TYPES={file:"📄 ملف",ocr:"✍️ نص من صورة",search:"🔎 بحث",image:"🖼️ صورة",ai:"🧪 فحص أسلوب ومضمون"};
+const SS={get:k=>{try{return sessionStorage.getItem(k)||""}catch(e){return ""}},set:(k,v)=>{try{sessionStorage.setItem(k,v);return true}catch(e){return false}}};
+const strn=(x,n)=>String(x==null?"":x).slice(0,n);
+const strs=x=>Array.isArray(x)?x.map(v=>strn(v,300)).filter(Boolean).slice(0,10):[];
+function newSession(){return {app:"abf-ai-session",v:1,id:"s"+Date.now().toString(36),created:new Date().toISOString(),updated:"",profile:{title:"",field:"",goal:""},entries:[],assessment:null,knowledge:[]}}
+function normAssess(a){
+  const idx=Math.max(1,Math.min(7,Math.round(+a.stageIdx||+a.stage||1)));
+  return {stageIdx:idx,stage:STAGES[idx-1],progress:Math.max(0,Math.min(100,Math.round(+a.progress||0))),level:strn(a.level,30)||"غير محدد",
+    summary:strn(a.summary,1200),strengths:strs(a.strengths),gaps:strs(a.gaps),next_steps:strs(a.next_steps),at:isNaN(new Date(a.at))?new Date().toISOString():new Date(a.at).toISOString()};
+}
+function normSession(j){
+  const s=newSession(), p=j.profile||{};
+  s.id=strn(j.id,40)||s.id; s.created=isNaN(new Date(j.created))?s.created:new Date(j.created).toISOString();
+  s.profile={title:strn(p.title,300),field:strn(p.field,200),goal:strn(p.goal,300)};
+  s.entries=(Array.isArray(j.entries)?j.entries:[]).filter(e=>e&&typeof e==="object").slice(-300).map(e=>({
+    id:strn(e.id,40)||("e"+Math.random().toString(36).slice(2)),
+    t:isNaN(new Date(e.t))?new Date().toISOString():new Date(e.t).toISOString(),
+    type:TYPES[e.type]?e.type:"file",title:strn(e.title,200),input:strn(e.input,2000),result:strn(e.result,12000),
+    summary:strn(e.summary||e.result,300).replace(/\s+/g," "),by:strn(e.by,100),
+    sources:(Array.isArray(e.sources)?e.sources:[]).slice(0,12).map(x=>({title:strn(x&&x.title,200),uri:strn(x&&x.uri,500)})),
+    scores:e.scores&&typeof e.scores==="object"?{style:+e.scores.style||0,content:+e.scores.content||0,overall:+e.scores.overall||0}:null}));
+  if(j.assessment&&typeof j.assessment==="object") s.assessment=normAssess(j.assessment);
+  s.knowledge=[...new Set((Array.isArray(j.knowledge)?j.knowledge:[]).map(x=>strn(x,200)).filter(Boolean))].slice(-40);
+  return s;
+}
+let SESSION=newSession();
+try{const j=JSON.parse(SS.get("abf_session")); if(j&&j.app==="abf-ai-session"&&Array.isArray(j.entries)) SESSION=normSession(j)}catch(e){}
+function saveSession(){
+  SESSION.updated=new Date().toISOString();
+  if(SS.set("abf_session",JSON.stringify(SESSION))) return;
+  SESSION.entries.slice(0,-5).forEach(e=>{e.result=e.result.slice(0,1500)}); // ضغط الأقدم عند امتلاء المساحة
+  if(!SS.set("abf_session",JSON.stringify(SESSION))) $("m6").textContent="تعذّر الحفظ المؤقت في المتصفح، نزّل السجل للاحتفاظ به.";
+}
+function logEntry(type,title,input,result,extra){
+  extra=extra||{}; result=String(result||"");
+  SESSION.entries.push({id:"e"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),t:new Date().toISOString(),type,
+    title:strn(title,200),input:strn(input,2000),result:result.slice(0,12000),summary:result.replace(/\s+/g," ").slice(0,300),
+    sources:(extra.sources||[]).slice(0,12).map(x=>({title:strn(x.title||x.uri,200),uri:strn(x.uri,500)})),by:strn(extra.by,100),scores:extra.scores||null});
+  if(SESSION.entries.length>300) SESSION.entries.shift();
+  saveSession(); renderSession();
+}
+// ملخص الذاكرة الذي يُرفق بطلبات الذكاء الاصطناعي ليكون مُلمًّا بمسيرة الباحث
+function memDigest(){
+  if(!$("memon").checked) return "";
+  const p=SESSION.profile, es=SESSION.entries.slice(-10), a=SESSION.assessment;
+  if(!es.length&&!p.title&&!a) return "";
+  let t="[ذاكرة الجلسة: سجل الباحث. استعملها لمعرفة مستواه ومرحلته واهتماماته ولتخصيص الإجابة وربطها بما سبق، ولا تعتمد عليها مصدرًا للحقائق.]\n";
+  if(p.title) t+="موضوع البحث: "+p.title+"\n";
+  if(p.field) t+="التخصص: "+p.field+"\n";
+  if(p.goal) t+="هدفه الحالي: "+p.goal+"\n";
+  if(a) t+=`آخر تقييم: المرحلة «${a.stage}» (${a.stageIdx}/7)، المستوى ${a.level}، التقدم ${a.progress}%`+(a.gaps.length?"، الفجوات: "+a.gaps.slice(0,3).join("؛"):"")+"\n";
+  if(SESSION.knowledge.length) t+="معارف اكتسبها: "+SESSION.knowledge.slice(-8).join("؛ ")+"\n";
+  if(es.length) t+="آخر أنشطته:\n"+es.map(e=>`- ${TYPES[e.type]} | ${e.title} ⇠ ${e.summary.slice(0,160)}`).join("\n")+"\n";
+  return t.slice(0,3500)+"[نهاية الذاكرة]";
+}
+function extractJSON(t){
+  const a=t.indexOf("{"), b=t.lastIndexOf("}"); if(a<0||b<=a) return null;
+  try{return JSON.parse(t.slice(a,b+1))}catch(e){return null}
+}
+function renderSession(){
+  const E=SESSION.entries, c=t=>E.filter(e=>t.includes(e.type)).length, a=SESSION.assessment;
+  $("stats6").innerHTML=[["الأنشطة",E.length],["البحوث",c(["search"])],["الملفات",c(["file","ocr"])],["الفحوص",c(["ai"])]].map(([l,n])=>`<div class="stat"><b>${n}</b>${l}</div>`).join("");
+  const idx=a?a.stageIdx:0;
+  $("stages6").innerHTML=STAGES.map((n,i)=>`<div class="stage ${i+1<idx?"done":i+1===idx?"cur":""}" title="${n}"></div>`).join("");
+  $("stagename6").textContent=a?`المرحلة ${a.stageIdx} من 7: ${a.stage} · المستوى: ${a.level}`:"لم يُقيَّم بعد. اضغط «قيّم مستواي ومرحلتي»";
+  $("meter6").style.background="linear-gradient(90deg,#0b73d9,#4fd4ff)"; $("meter6").style.width=(a?a.progress:0)+"%";
+  $("pct6").textContent=a?a.progress+"%":"";
+  const L=(t,arr)=>arr&&arr.length?`**${t}**\n`+arr.map(x=>"- "+x).join("\n")+"\n\n":"";
+  setOut($("out6"),a?`${a.summary}\n\n`+L("نقاط القوة",a.strengths)+L("الفجوات",a.gaps)+L("الخطوات القادمة",a.next_steps)+L("ما اكتسبته من معارف",SESSION.knowledge.slice(-8)):"");
+  const box=$("list6"); box.textContent="";
+  if(!E.length){box.innerHTML='<div class="meta">لا توجد أنشطة بعد. كل بحث أو ملف تعالجه سيُسجَّل هنا تلقائيًا.</div>';return}
+  [...E].reverse().slice(0,60).forEach(e=>{
+    const d=document.createElement("details"); d.className="ent";
+    const sm=document.createElement("summary"); sm.textContent=(TYPES[e.type]||e.type)+" · "+e.title+" ";
+    const tm=document.createElement("small"); tm.textContent=new Date(e.t).toLocaleString("ar"); sm.appendChild(tm); d.appendChild(sm);
+    if(e.input){const i=document.createElement("div");i.className="meta";i.textContent="المدخل: "+e.input;d.appendChild(i)}
+    if(e.scores){const i=document.createElement("div");i.className="meta";i.textContent=`الأسلوب ${e.scores.style}% · المضمون ${e.scores.content}% · الإجمالي ${e.scores.overall}%`;d.appendChild(i)}
+    const o=document.createElement("div");o.className="out";o.innerHTML=md(e.result);d.appendChild(o);
+    e.sources.filter(x=>/^https?:\/\//i.test(x.uri)).forEach(x=>{const l=document.createElement("a");l.href=x.uri;l.target="_blank";l.rel="noopener";l.textContent=x.title||x.uri;l.style.cssText="display:block;color:var(--acc);word-break:break-all;font-size:.85rem";d.appendChild(l)});
+    const m=document.createElement("div");m.className="meta";m.textContent=e.by?"بواسطة: "+e.by:"";d.appendChild(m);
+    const x=document.createElement("button");x.className="sec";x.textContent="حذف هذا السجل";x.style.cssText="padding:4px 12px;font-size:.85rem";
+    x.onclick=()=>{SESSION.entries=SESSION.entries.filter(y=>y.id!==e.id);saveSession();renderSession()};d.appendChild(x);
+    box.appendChild(d);
+  });
+}
+function fillProfile(){$("pf_title").value=SESSION.profile.title;$("pf_field").value=SESSION.profile.field;$("pf_goal").value=SESSION.profile.goal}
+[["pf_title","title"],["pf_field","field"],["pf_goal","goal"]].forEach(([id,k])=>$(id).addEventListener("input",()=>{SESSION.profile[k]=$(id).value.trim();saveSession()}));
+function dlBlob(name,text,type){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),4000)}
+const stamp=()=>new Date().toISOString().slice(0,16).replace(/[:T]/g,"-");
+$("dl6").onclick=()=>{saveSession();dlBlob("abf-session-"+stamp()+".json",JSON.stringify(SESSION,null,1),"application/json")};
+$("rp6").onclick=()=>{
+  const p=SESSION.profile,a=SESSION.assessment;
+  let t=`تقرير جلسة البحث · ${new Date().toLocaleString("ar")}\nالموضوع: ${p.title||"-"}\nالتخصص: ${p.field||"-"}\nالهدف: ${p.goal||"-"}\n`;
+  if(a) t+=`\nالمرحلة: ${a.stage} (${a.stageIdx}/7) · المستوى: ${a.level} · التقدم: ${a.progress}%\n${a.summary}\n`+
+    ["strengths","gaps","next_steps"].map((k,i)=>a[k].length?`\n${["نقاط القوة","الفجوات","الخطوات القادمة"][i]}:\n`+a[k].map(x=>"- "+x).join("\n"):"").join("")+"\n";
+  if(SESSION.knowledge.length) t+="\nالمعارف المكتسبة:\n"+SESSION.knowledge.map(x=>"- "+x).join("\n")+"\n";
+  t+="\n====== الأنشطة ======\n"+SESSION.entries.map(e=>`\n[${new Date(e.t).toLocaleString("ar")}] ${TYPES[e.type]} · ${e.title}\n${e.input?"المدخل: "+e.input+"\n":""}${e.result}\n`+(e.sources.length?"المصادر:\n"+e.sources.map(x=>"  "+x.title+" "+x.uri).join("\n")+"\n":"")).join("\n");
+  dlBlob("abf-report-"+stamp()+".txt",t,"text/plain;charset=utf-8");
+};
+$("up6").onclick=()=>$("f6").click();
+$("f6").onchange=async()=>{
+  const f=$("f6").files[0]; $("f6").value=""; if(!f) return; const m=$("m6"); m.className="meta";
+  try{
+    const j=JSON.parse(await f.text()); if(!j||j.app!=="abf-ai-session"||!Array.isArray(j.entries)) throw new Error("ملف غير صالح");
+    const inc=normSession(j);
+    if(SESSION.entries.length&&!confirm("يوجد سجل حالي. موافق = دمج السجل المرفوع معه، إلغاء = استبدال الحالي بالمرفوع.")) SESSION=inc;
+    else if(SESSION.entries.length){
+      const ids=new Set(SESSION.entries.map(e=>e.id));
+      SESSION.entries=[...SESSION.entries,...inc.entries.filter(e=>!ids.has(e.id))].sort((x,y)=>x.t<y.t?-1:1).slice(-300);
+      const P=SESSION.profile; ["title","field","goal"].forEach(k=>{if(!P[k]) P[k]=inc.profile[k]});
+      if(inc.assessment&&(!SESSION.assessment||inc.assessment.at>SESSION.assessment.at)) SESSION.assessment=inc.assessment;
+      SESSION.knowledge=[...new Set([...SESSION.knowledge,...inc.knowledge])].slice(-40);
+    } else SESSION=inc;
+    saveSession(); fillProfile(); renderSession(); m.textContent="تم تحميل السجل: "+SESSION.entries.length+" نشاطًا. يمكنك الآن الضغط على «قيّم مستواي ومرحلتي».";
+  }catch(e){m.className="meta err";m.textContent="تعذّر رفع السجل: "+e.message}
+};
+$("clr6").onclick=()=>{
+  if(!confirm("سيُمسح السجل الحالي كاملًا. هل نزّلت نسخة منه؟ المتابعة؟")) return;
+  SESSION=newSession(); saveSession(); fillProfile(); renderSession(); $("m6").textContent="";
+};
+$("assess6").onclick=async()=>{
+  const m=$("m6"),btn=$("assess6"); m.className="meta"; m.textContent="";
+  if(!SESSION.entries.length&&!SESSION.profile.title){m.className="meta err";m.textContent="لا توجد أنشطة ولا تفاصيل بعد. استخدم الموقع أو أضف عنوان بحثك أولًا.";return}
+  btn.disabled=true; m.textContent="الذكاء الاصطناعي يحلّل مسيرتك البحثية…";
+  try{
+    const p=SESSION.profile;
+    const log=SESSION.entries.slice(-30).map((e,i)=>`#${i+1} [${e.t.slice(0,16)}] ${TYPES[e.type]} | ${e.title}\nالمدخل: ${e.input.slice(0,300)}\nالنتيجة: ${e.result.slice(0,600).replace(/\s+/g," ")}`+(e.scores?`\nدرجات الفحص: أسلوب ${e.scores.style}% مضمون ${e.scores.content}%`:"")).join("\n\n");
+    const prompt=`أنت مشرف أكاديمي خبير. قيّم مدى تقدّم الباحث ومستواه العلمي اعتمادًا على سجل نشاطه فقط، دون مبالغة ودون اختراع.
+المراحل (رقّمها): ${STAGES.map((x,i)=>(i+1)+"="+x).join("، ")}.
+بيانات الباحث: العنوان: ${p.title||"غير محدد"} | التخصص: ${p.field||"غير محدد"} | الهدف: ${p.goal||"غير محدد"}
+${SESSION.assessment?"تقييمه السابق: المرحلة "+SESSION.assessment.stageIdx+" وتقدمه "+SESSION.assessment.progress+"%\n":""}
+=== سجل النشاط ===
+${log||"(لا أنشطة)"}
+
+أرجع JSON صالحًا فقط، دون أي نص قبله أو بعده ودون علامات \`\`\`، بهذا الشكل:
+{"stage":رقم من 1 إلى 7,"progress":رقم من 0 إلى 100 يمثل التقدم الكلي في رحلة البحث,"level":"مبتدئ أو متوسط أو متقدم","summary":"تقييم من 2-3 جمل لما وصل إليه","strengths":["..."],"gaps":["..."],"next_steps":["خطوات عملية محددة"],"knowledge":["3 إلى 8 معارف أو مفاهيم رئيسية اكتسبها الباحث من نشاطه"]}
+اكتب القيم النصية بالعربية.`;
+    const r=await ask({text:prompt,maxTokens:2048});
+    const j=extractJSON(r.text);
+    if(!j){m.className="meta err";setOut($("out6"),r.text);m.textContent="تعذّر قراءة التقييم بصيغته المنظمة، هذا نصه الخام.";btn.disabled=false;return}
+    SESSION.assessment=normAssess({...j,stageIdx:j.stage,at:new Date().toISOString()});
+    SESSION.knowledge=[...new Set([...SESSION.knowledge,...strs(j.knowledge)])].slice(-40);
+    saveSession(); renderSession(); m.textContent="تم التقييم بواسطة: "+r.by+" · هذا تقدير استرشادي مبني على ما سُجّل في الجلسة فقط";
+  }catch(e){m.className="meta err";m.textContent=e.message}
+  btn.disabled=false;
+};
+fillProfile(); renderSession();
+
 // ====== الموجّه: تسلسل المزوّدين والمودلات ======
 let IMG_MODELS=["gemini-2.5-flash-image"];
 let GEM_MODELS=["gemini-3.8-flash","gemini-3.5-flash-lite"];
@@ -302,7 +508,10 @@ async function openai(url,key,model,{text,maxTokens}){
 const BAD={};
 async function ask(payload){
   const hasImg=(payload.images||[]).length>0, errs=[];
-  let list=providers(hasImg); const ok=list.filter(p=>!(BAD[p.name]>Date.now())); if(ok.length) list=ok;
+  if(payload.mem){const d=memDigest(); if(d) payload={...payload,text:d+"\n\n"+payload.text}}
+  let list=providers(hasImg);
+  if(payload.only){ list=list.filter(p=>p.name.startsWith(payload.only)); if(!list.length) throw new Error("لا يتوفر مزوّد "+payload.only+"، أضف مفتاحه من زر «المزوّدون»"); }
+  const ok=list.filter(p=>!(BAD[p.name]>Date.now())); if(ok.length) list=ok;
   const li=list.findIndex(p=>p.name===window.LAST_OK); if(li>0) list.unshift(list.splice(li,1)[0]);
   for(const p of list){
     try{
@@ -384,8 +593,9 @@ $("go1").onclick=async()=>{
       tr:`ترجم المحتوى كاملًا إلى: ${L}، مع الحفاظ على بنيته.`,
       ex:`استخرج النص كاملًا كما هو دون تغيير أو تلخيص.`}[k];
     out.textContent="جارٍ المعالجة…";
-    const r=await ask({text:`${ins}\n${q?"تعليمات المستخدم: "+q+"\n":""}\n=== المحتوى ===\n${d.text}`,images:d.images});
+    const r=await ask({text:`${ins}\n${q?"تعليمات المستخدم: "+q+"\n":""}\n=== المحتوى ===\n${d.text}`,images:d.images,mem:true});
     setOut(out,r.text); m.textContent="تمت المعالجة بواسطة: "+r.by;
+    logEntry("file",$("task").selectedOptions[0].text+" · "+file1.name,(q?q+" | ":"")+L,r.text,{by:r.by});
   }catch(e){out.className="out err";out.textContent=e.message}
   btn.disabled=false;
 };
@@ -402,168 +612,37 @@ $("go2").onclick=async()=>{
     const r=await ask({text:"انسخ كل النص الظاهر في الصورة (مكتوب بخط اليد أو مطبوع) حرفيًا وبنفس ترتيب الأسطر واللغة الأصلية. أرجع النص فقط دون أي شرح. إن كانت كلمة غير واضحة فاكتب [؟] مكانها.",
       images:[{mime:file2.type,data:await fileB64(file2)}]});
     $("out2").value=r.text; m.textContent="تمت المعالجة بواسطة: "+r.by;
+    logEntry("ocr","استخراج نص · "+file2.name,"",r.text,{by:r.by});
   }catch(e){$("out2").value="";m.innerHTML='<span class="err"></span>';m.firstChild.textContent=e.message}
   btn.disabled=false;
 };
 $("cp2").onclick=()=>copy($("out2").value,$("cp2"));
 $("dl2").onclick=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([$("out2").value],{type:"text/plain;charset=utf-8"}));a.download="extracted.txt";a.click()};
 
-// ====== البحث بدون ملفات ======
-async function webContext(q){
-  const tk=K("tav");
-  if(tk||PROXY){
-    try{
-      const r=await fetch(PROXY?PROXY+"/tavily/search":"https://api.tavily.com/search",{method:"POST",headers:{"Content-Type":"application/json",...(tk?{Authorization:"Bearer "+tk}:{})},body:JSON.stringify({query:q,max_results:8})});
-      const j=await r.json(); if(r.ok&&j.results?.length) return j.results.map(x=>({title:x.title,url:x.url,content:(x.content||"").slice(0,1500)}));
-    }catch(e){}
-  }
-  const l=/[\u0600-\u06FF]/.test(q)?"ar":"en";
-  try{
-    const u=`https://${l}.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(q)}&gsrlimit=5&prop=extracts&exintro=1&explaintext=1&exlimit=5&format=json&origin=*`;
-    const j=await (await fetch(u)).json();
-    return Object.values(j.query?.pages||{}).sort((a,b)=>a.index-b.index).map(p=>({title:p.title,url:`https://${l}.wikipedia.org/wiki/${encodeURIComponent(p.title.replace(/ /g,"_"))}`,content:(p.extract||"").slice(0,2500)}));
-  }catch(e){return []}
+// ====== البحث بالذكاء الاصطناعي ======
+async function fetchJ(u,opt,ms){
+  const c=new AbortController(), t=setTimeout(()=>c.abort(),ms||12000);
+  try{const r=await fetch(u,{...(opt||{}),signal:c.signal}); if(!r.ok) throw new Error(r.status); return await r.json()} finally{clearTimeout(t)}
 }
-const DEPTH={
-  fast:"أجب بإيجاز مفيد في فقرة أو فقرتين مع أهم الحقائق.",
-  detailed:"اكتب إجابة شاملة ومنظمة: ابدأ بالخلاصة في جملتين، ثم التفاصيل بعناوين فرعية ونقاط، مع الأرقام والتواريخ والأسماء حين تتوفر، ثم ملاحظات أو خلافات بين المصادر إن وُجدت. لا تختصر ولا تتجاهل جانبًا مهمًا.",
-  deep:"اكتب تقريرًا معمّقًا ومنظمًا يغطي كل الجوانب الفرعية المذكورة أدناه، بعناوين ونقاط وأرقام وتواريخ ومقارنات حين تلزم، وانتهِ بخلاصة وتوصية عملية إن كان السؤال يحتمل ذلك."
-};
-async function doSearch(q){
-  const out=$("out3"),src=$("src3"),m=$("m3"),btn=$("go3"),depth=$("sdepth").value,fu=$("fu3");
-  out.className="out";out.dataset.raw="";src.textContent="";m.textContent="";fu.textContent="";
-  if(!q){out.className="out err";out.textContent="اكتب سؤالك أولًا";return}
-  btn.disabled=true; const t0=Date.now(); let busyMsg="";
-  const busy=t=>{busyMsg=t;out.textContent=t}, tick=setInterval(()=>{if(busyMsg)out.textContent=busyMsg+" ("+Math.round((Date.now()-t0)/1000)+" ث)"},1000);
+const oaAbs=inv=>{if(!inv)return "";const a=[];for(const [w,ps] of Object.entries(inv))ps.forEach(p=>a[p]=w);return a.filter(Boolean).join(" ")};
+// الذكاء الاصطناعي يفهم السؤال ويكتب استعلامات بحث دقيقة
+async function planQueries(q){
   try{
-    let subs="";
-    if(depth==="deep"){
-      busy("أحلّل السؤال وأحدد جوانبه…");
-      try{subs=(await ask({text:`حلّل السؤال التالي واكتب 4 أسئلة فرعية تغطي جوانبه الأساسية لبحث شامل. اكتب كل سؤال في سطر يبدأ بـ "- " وبنفس لغة السؤال، دون أي شرح.\nالسؤال: ${q}`,maxTokens:1024})).text.trim()}catch(e){}
-    }
-    const today=new Date().toLocaleDateString("ar",{year:"numeric",month:"long",day:"numeric"});
-    const prompt=`أنت باحث خبير. تاريخ اليوم: ${today}.
-افهم قصد السائل الحقيقي حتى لو كان سؤاله مختصرًا أو ناقصًا أو فيه أخطاء إملائية. وإن كان غامضًا فاذكر في سطر واحد كيف فسّرته ثم أجب مغطيًا أهم التفسيرات.
-${DEPTH[depth]}
-${subs?"الجوانب المطلوب تغطيتها:\n"+subs+"\n":""}أجب بلغة السؤال نفسها، ولا تخترع معلومات غير مدعومة بنتائج البحث.
-في آخر الإجابة أضف ثلاثة أسئلة متابعة مقترحة، كل سؤال في سطر مستقل يبدأ بـ Q: فقط.
-السؤال: ${q}`;
-    const mt=depth==="fast"?4096:8192;
-    busy("أبحث في الإنترنت…");
-    let r=null,why="";
-    try{ r=await ask({search:true,text:prompt,maxTokens:mt}); }catch(e1){ why=e1.message.split("\n")[0].slice(0,160); }
-    if(!r||(!r.sources.length&&!r.by.startsWith("Gemini"))){
-      busy("البحث المباشر لم يعمل، جارٍ البحث بطريقة احتياطية…");
-      const ctx=await webContext(q);
-      if(ctx.length){
-        const c=ctx.map((x,i)=>`[${i+1}] ${x.title}\n${x.content}`).join("\n\n");
-        const r2=await ask({text:`${prompt}\n\n=== نتائج البحث (اعتمد عليها، وإن لم تكفِ فاذكر ذلك بصراحة) ===\n${c}`,maxTokens:mt});
-        r={text:r2.text,by:r2.by+" + بحث احتياطي",sources:ctx.map(x=>({uri:x.url,title:x.title}))};
-      } else if(!r){ r=await ask({text:prompt,maxTokens:mt}); r.by+=" (بدون بحث)"; }
-    }
-    busyMsg="";
-    const follow=[...r.text.matchAll(/^\s*Q:\s*(.+)$/gm)].map(x=>x[1].trim()).slice(0,3);
-    setOut(out,r.text.replace(/^\s*Q:\s*.+$/gm,"").trim());
-    m.textContent="تمت المعالجة بواسطة: "+r.by+" · "+Math.round((Date.now()-t0)/1000)+" ث"+(why?" | سبب تعذر البحث المباشر: "+why:"");
-    const seen=new Set();
-    (r.sources||[]).forEach(s=>{ if(seen.has(s.uri))return; seen.add(s.uri);
-      const a=document.createElement("a");a.href=s.uri;a.target="_blank";a.rel="noopener";a.textContent=(s.title||s.uri);
-      a.style.cssText="display:block;color:var(--acc);word-break:break-all";src.appendChild(a)});
-    if(seen.size) src.prepend("المصادر:");
-    follow.forEach(t=>{const b=document.createElement("button");b.className="sec";b.textContent=t;b.style.cssText="text-align:start;font-weight:500";
-      b.onclick=()=>{$("sq").value=t;doSearch(t)};fu.appendChild(b)});
-  }catch(e){busyMsg="";out.className="out err";out.textContent=e.message}
-  clearInterval(tick); btn.disabled=false;
+    const t=(await ask({text:`أنت خبير بحث. حوّل سؤال المستخدم إلى 3 استعلامات بحث قصيرة ودقيقة (3-8 كلمات): الأول بلغة السؤال، والثاني بالإنجليزية، والثالث بالإنجليزية بصياغة أكاديمية إن كان السؤال علميًا. صحّح الأخطاء الإملائية واستنتج المقصود. اكتب كل استعلام في سطر مستقل دون ترقيم أو شرح.\nالسؤال: ${q}`,maxTokens:300})).text;
+    const qs=t.split("\n").map(x=>x.replace(/^[\s\-*•\d.)]+/,"").replace(/^["']|["']$/g,"").trim()).filter(x=>x.length>2&&x.length<140).slice(0,3);
+    return qs.length?qs:[q];
+  }catch(e){return [q]}
 }
-$("go3").onclick=()=>doSearch($("sq").value.trim());
-$("sq").addEventListener("keydown",e=>{if(e.key==="Enter"&&(e.ctrlKey||e.metaKey))$("go3").click()});
-$("cp3").onclick=()=>copy($("out3").dataset.raw||$("out3").textContent,$("cp3"));
-
-
-// ====== أساليب البحوث: تقدير نسبة الذكاء الاصطناعي في بحث ======
-let file5=null;
-drop($("drop5"),$("f5"),f=>{file5=f;$("fname5").textContent="📎 "+f.name;$("v5").textContent="";$("meter5").style.width="0";$("pct5").textContent="";$("out5").dataset.raw="";$("out5").textContent="";$("m5").textContent=""});
-$("go5").onclick=async()=>{
-  const out=$("out5"),m=$("m5"),btn=$("go5"),v=$("v5"),meter=$("meter5"),pct=$("pct5");
-  out.className="out";out.textContent="";out.dataset.raw="";m.textContent="";v.textContent="";pct.textContent="";meter.style.width="0";
-  if(!file5){out.className="out err";out.innerHTML='<span class="err">اختر ملفًا أولًا</span>';return}
-  btn.disabled=true;
-  try{
-    out.textContent="جارٍ قراءة الملف…";
-    const d=await readFile(file5,p=>$("bar5").style.width=(p*100)+"%");
-    $("bar5").style.width="0";
-    out.textContent="جارٍ تحليل البحث… قد يستغرق دقيقة للأطروحات الطويلة";
-    const prompt=`أنت خبير في منهجية البحوث الأكاديمية وتحليل الأنماط اللغوية للنصوص. مهمتك تقدير نسبة الاعتماد على أدوات الذكاء الاصطناعي في كتابة البحث/التقرير المرفق.
-حلّل النص على النحو التالي:
-1) المؤشرات الدالة على توليد آلتي: الصياغات العامة والمتكررة، غياب الأمثلة والتفاصيل الخاصة، انتظام البنية بشكل مصطنع، غياب المراجع المحددة، الأسلوب اللغوي الموحد، الغياب المفاجئ للأخطاء، العبارات الانتقالية النمطية، وتنبؤ بما سيأتي في الجمل.
-2) المؤشرات الدالة على الكتابة البشرية: الطابع الشخصي، الأخطاء الطبيعية، الاتساق البشري، أمثلة من واقع الباحث، مراجع محددة، وطرق تحليل متنوعة.
-3) اذكر أي أقسام أو صفحات بدا فيها نمط معين أقوى من غيره.
-أجب بالعربية وبالتنسيق التالي تمامًا في أول الأسطر:
-نسبة الذكاء الاصطناعي التقديرية: رقم%
-ثم النتيجة النهائية: (إنساني غالبًا / مزيج بين الإنسان والذكاء الاصطناعي / منشأ غالبًا بالذكاء الاصطناعي)
-ثم سطر "المؤشرات:" تليها نقاط مختصرة، ثم "توصيات الباحث:" بنقاط عملية لتحسين البحث.`;
-    const r=await ask({text:prompt+"\n\n=== النص ===\n"+d.text,images:d.images});
-    const raw=r.text;
-    const mm=raw.match(/(\d{1,3})\s*%/);
-    let num=mm?Math.max(0,Math.min(100,parseInt(mm[1]))):null;
-    if(num===null){const m2=raw.match(/(\d{1,3})\s*(?:من\s*100|بالمئة|نسبة)/); if(m2) num=Math.max(0,Math.min(100,parseInt(m2[1])));}
-    if(num!==null){
-      meter.style.width=num+"%";
-      pct.textContent=num+"%";
-      let col,txt;
-      if(num<30){col="#2fd97c";txt="النتيجة النهائية: إنساني غالبًا ✔"}
-      else if(num<60){col="#ffd23f";txt="النتيجة النهائية: مزيج بين الإنسان والذكاء الاصطناعي ⚠"}
-      else{col="#ff6b5e";txt="النتيجة النهائية: منشأ غالبًا بالذكاء الاصطناعي ✖"}
-      meter.style.background=col; pct.style.color=col;
-      v.innerHTML='<span class="badge" style="background:'+col+'22;color:'+col+';border:1px solid '+col+'">'+txt+'</span>';
-    }
-    setOut(out,raw);
-    m.textContent="تم التحليل بواسطة: "+r.by+" · ملاحظة: هذا تقدير آلي استرشادي وليس حكمًا نهائيًا مؤكدًا";
-  }catch(e){out.className="out err";out.textContent=e.message}
-  btn.disabled=false;
-};
-// ====== توليد الصور ======
-async function genImage(prompt,w,h){
-  const gk=K("gem"), errs=[];
-  if((gk||PROXY)&&!window.IMG_SKIP) for(const m of IMG_MODELS){
-    try{
-      const j=await withKeys(k=>gcall(k,m,{contents:[{role:"user",parts:[{text:prompt}]}],generationConfig:{responseModalities:["TEXT","IMAGE"]}}));
-      const p=(j.candidates?.[0]?.content?.parts||[]).find(x=>x.inlineData||x.inline_data), d=p&&(p.inlineData||p.inline_data);
-      if(d) return {src:`data:${d.mimeType||d.mime_type||"image/png"};base64,${d.data}`,by:"Gemini · "+m};
-      throw new Error("لم يرجع صورة");
-    }catch(e){errs.push(m+": "+e.message); if(/limit: 0/.test(e.message)) window.IMG_SKIP=true}
-  }
-  const load=url=>new Promise((res,rej)=>{const i=new Image();i.referrerPolicy="no-referrer";const t=setTimeout(()=>rej(new Error("انتهت المهلة")),90000);
-    i.onload=()=>{clearTimeout(t);res(url)};i.onerror=()=>{clearTimeout(t);rej(new Error("تعذّر تحميل الصورة"))};i.src=url});
-  const q=encodeURIComponent(prompt), seed=Math.floor(Math.random()*1e6), pk=K("pol");
-  const tries=[];
-  if(pk) tries.push(["Pollinations (بمفتاح)",`https://gen.pollinations.ai/image/${q}?width=${w}&height=${h}&seed=${seed}&model=flux&key=${encodeURIComponent(pk)}`]);
-  tries.push(["Pollinations",`https://image.pollinations.ai/prompt/${q}?width=${w}&height=${h}&seed=${seed}&model=flux&nologo=true`]);
-  if(PROXY) tries.unshift(["Pollinations (عبر الخادم)",`${PROXY}/pollinations/image/${q}?width=${w}&height=${h}&seed=${seed}&model=flux`]);
-  for(const [name,url] of tries){
-    try{ return {src:await load(url),by:name}; }catch(e){errs.push(name+": "+e.message)}
-  }
-  throw new Error("تعذّر توليد الصورة.\n"+errs.map(x=>x.slice(0,140)).join("\n"));
-}
-$("go4").onclick=async()=>{
-  const q=$("iq").value.trim(),m=$("m4"),img=$("iout"),btn=$("go4"); m.className="meta";
-  if(!q){m.className="meta err";m.textContent="اكتب وصف الصورة أولًا";return}
-  btn.disabled=true;$("dl4").hidden=true;img.hidden=true;m.textContent="جارٍ التوليد… قد يستغرق حتى دقيقة";
-  try{
-    let p=q;
-    if($("itr").checked&&/[\u0600-\u06FF]/.test(q)){
-      try{const t=(await ask({text:"Translate this image description to English. Output only the translation: "+q})).text.trim().replace(/^["']|["']$/g,""); if(t) p=t}catch(e){}
-    }
-    const [w,h]=$("isize").value.split("x"); const r=await genImage(p,w,h);
-    img.src=r.src;img.hidden=false;$("dl4").hidden=false;
-    m.textContent="بواسطة: "+r.by+(p!==q?" | الوصف المستخدم: "+p:"");
-  }catch(e){m.className="meta err";m.textContent=e.message}
-  btn.disabled=false;
-};
-$("dl4").onclick=async()=>{
-  const src=$("iout").src, a=document.createElement("a");
-  try{a.href=URL.createObjectURL(await (await fetch(src)).blob());a.download="abf-ai-image.png";a.click()}catch(e){window.open(src,"_blank")}
-};
-</script>
-</body>
-</html>
+// جلب مصادر احتياطية لعدة استعلامات: Tavily إن وُجد المفتاح، ثم ويكيبيديا وOpenAlex للأبحاث
+async function webContext(qs){
+  const tk=K("tav"), res=[], seen=new Set(), jobs=[];
+  const add=x=>{if(!x.url||!x.content||seen.has(x.url))return;seen.add(x.url);res.push(x)};
+  qs.forEach(q=>{
+    const l=/[\u0600-\u06FF]/.test(q)?"ar":"en", e=encodeURIComponent(q);
+    if(tk||PROXY) jobs.push((async()=>{try{
+      const j=await fetchJ(PROXY?PROXY+"/tavily/search":"https://api.tavily.com/search",{method:"POST",headers:{"Content-Type":"application/json",...(tk?{Authorization:"Bearer "+tk}:{})},body:JSON.stringify({query:q,max_results:6})});
+      (j.results||[]).forEach(x=>add({title:x.title,url:x.url,content:(x.content||"").slice(0,1500)}));
+    }catch(_){}})());
+    jobs.push((async()=>{try{
+      const j=await fetchJ(`https://${l}.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${e}&gsrlimit=4&prop=extracts&exintro=1&explaintext=1&exlimit=4&format=json&origin=*`);
+      Object.values(j.query?.pages||{}).sort((a,b)=>a.index-b.index).forEach(p=>add({title:p.title+" (ويكيبيديا)",url:`https://${l}.wikipedia.org/wiki/${encodeURICompone
