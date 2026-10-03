@@ -175,6 +175,17 @@ dialog label{display:block;font-weight:700;margin:12px 0 4px}
     <input type="password" id="k_pol" dir="ltr">
     <label>مفتاح Groq (نص فقط)</label>
     <input type="password" id="k_groq" dir="ltr">
+    <hr style="border:0;border-top:1px solid var(--line);margin:16px 0 4px">
+    <label>API مخصص (متوافق مع OpenAI) · يعمل في كل الصفحات</label>
+    <p class="meta" style="margin:0 0 6px">أي خدمة تدعم صيغة OpenAI: OpenAI، DeepSeek، Together، Mistral، LM Studio، Ollama وغيرها. يُجرَّب أولًا قبل بقية المزوّدين.</p>
+    <div class="row" style="margin:6px 0"><button type="button" class="sec" id="cu_fta">ضبط FreeTheAI</button><button type="button" class="sec" id="cu_models">جلب النماذج</button></div>
+    <input type="text" id="k_cuurl" dir="ltr" placeholder="الرابط، مثال: https://api.openai.com/v1">
+    <input type="text" id="k_cumodel" dir="ltr" list="cu_list" placeholder="اسم النموذج، مثال: fta/zai/glm-5.3" style="margin-top:6px">
+    <datalist id="cu_list"></datalist>
+    <div class="meta" id="cu_msg"></div>
+    <input type="password" id="k_cukey" dir="ltr" placeholder="المفتاح (اتركه فارغًا إن لم يلزم)" style="margin-top:6px">
+    <label style="display:flex;align-items:center;gap:6px;font-weight:500;margin-top:8px"><input type="checkbox" id="k_cuvis"> النموذج يدعم الصور (للملفات والصور المصوّرة)</label>
+    <input type="text" id="k_cuimg" dir="ltr" placeholder="نموذج توليد الصور (اختياري)، مثال: dall-e-3" style="margin-top:6px">
     <div class="row"><button class="pri" id="save" value="ok">حفظ</button><button class="sec" value="x">إغلاق</button></div>
     </div>
   </form>
@@ -238,7 +249,7 @@ async function copy(text,btn){
   try{await navigator.clipboard.writeText(text)}catch(e){const t=document.createElement("textarea");t.value=text;document.body.appendChild(t);t.select();try{document.execCommand("copy")}catch(_){}t.remove()}
   if(btn){const o=btn.textContent;btn.textContent="تم النسخ ✓";setTimeout(()=>btn.textContent=o,1200)}
 }
-function showHint(){$("hint").hidden=!!(PROXY||K("gem")||K("groq")||K("or"))}
+function showHint(){$("hint").hidden=!!(PROXY||K("gem")||K("groq")||K("or")||customCfg())}
 showHint();
 // تبويبات
 document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>{
@@ -246,8 +257,22 @@ document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>{
   b.classList.add("on"); $(b.dataset.t).classList.add("on");
 });
 // إعدادات
-["gem","or","groq","tav","pol"].forEach(n=>$("k_"+n).value=store.get("k_"+n));
-$("save").onclick=()=>{["gem","or","groq","tav","pol"].forEach(n=>store.set("k_"+n,$("k_"+n).value.trim()));window.IMG_SKIP=false;loadModels();showHint()};
+["gem","or","groq","tav","pol","cuurl","cumodel","cukey","cuimg"].forEach(n=>$("k_"+n).value=store.get("k_"+n));
+$("k_cuvis").checked=store.get("k_cuvis")==="1";
+$("cu_fta").onclick=()=>{$("k_cuurl").value="https://api.freetheai.org/v1"; if(!$("k_cumodel").value.trim()) $("k_cumodel").value="fta/zai/glm-5.3"; $("cu_msg").className="meta"; $("cu_msg").textContent="تم ضبط FreeTheAI. ضع مفتاحك (من freetheai.org/signup) ثم اضغط حفظ. اكتب معرّف النموذج كاملًا مع البادئة fta/."};
+$("cu_models").onclick=async()=>{
+  const m=$("cu_msg"), u=$("k_cuurl").value.trim().replace(/\/+$/,""), k=$("k_cukey").value.trim(); m.className="meta";
+  if(!u){m.className="meta err";m.textContent="أدخل الرابط أولًا";return}
+  m.textContent="جارٍ الجلب…";
+  try{
+    const r=await fetch(u.replace(/\/(chat\/completions|images\/generations)$/,"")+"/models",{headers:k?{Authorization:"Bearer "+k}:{}});
+    const j=await r.json(); if(!r.ok) throw new Error(j.error?.message||r.status);
+    const ids=(j.data||[]).map(x=>x.id).filter(Boolean);
+    $("cu_list").innerHTML=ids.map(i=>'<option value="'+i.replace(/"/g,"&quot;")+'">').join("");
+    m.textContent="تم جلب "+ids.length+" نموذج. اضغط حقل النموذج لاختيار أحدها.";
+  }catch(e){m.className="meta err";m.textContent="تعذّر الجلب: "+e.message+" (قد يلزم مفتاح، أو يمنع المزوّد الاتصال من المتصفح)"}
+};
+$("save").onclick=()=>{["gem","or","groq","tav","pol","cuurl","cumodel","cukey","cuimg"].forEach(n=>store.set("k_"+n,$("k_"+n).value.trim()));store.set("k_cuvis",$("k_cuvis").checked?"1":"0");window.IMG_SKIP=false;loadModels();showHint()};
 
 // ====== الموجّه: تسلسل المزوّدين والمودلات ======
 let IMG_MODELS=["gemini-2.5-flash-image"];
@@ -266,8 +291,16 @@ async function loadModels(){ // يجلب المودلات المتاحة فعل�
   }catch(e){}
 }
 loadModels();
+// ====== API مخصص (متوافق مع OpenAI) ======
+function customCfg(){
+  const url=store.get("k_cuurl").trim().replace(/\/+$/,""), model=store.get("k_cumodel").trim();
+  if(!url||!model) return null;
+  return {url,model,key:store.get("k_cukey").trim(),vision:store.get("k_cuvis")==="1",img:store.get("k_cuimg").trim()};
+}
+const cuEndpoint=(base,path)=>base.replace(/\/(chat\/completions|images\/generations)$/,"")+path;
 function providers(needVision){
-  const list=[], gk=K("gem");
+  const list=[], gk=K("gem"), cu=customCfg();
+  if(cu&&(!needVision||cu.vision)) list.push({name:"API مخصص · "+cu.model,vision:cu.vision,limit:100000,run:(p)=>openai(cuEndpoint(cu.url,"/chat/completions"),cu.key,cu.model,p)});
   if(gk||PROXY) GEM_MODELS.forEach(m=>list.push({name:"Gemini · "+m,vision:true,limit:300000,run:(p)=>withKeys(k=>gemini(k,m,p))}));
   const or=K("or"), gq=K("groq");
   if((or||PROXY)&&!needVision) list.push({name:"OpenRouter · llama-3.3-70b",vision:false,limit:60000,run:(p)=>openai(PROXY?PROXY+"/openrouter/api/v1/chat/completions":"https://openrouter.ai/api/v1/chat/completions",or,"meta-llama/llama-3.3-70b-instruct:free",p)});
@@ -293,9 +326,10 @@ async function gemini(key,model,{text,images,search,maxTokens}){
   const sources=(j.candidates[0].groundingMetadata?.groundingChunks||[]).map(c=>c.web).filter(Boolean);
   return {text:t,sources};
 }
-async function openai(url,key,model,{text,maxTokens}){
+async function openai(url,key,model,{text,maxTokens,images}){
+  const content=(images&&images.length)?[{type:"text",text},...images.map(i=>({type:"image_url",image_url:{url:`data:${i.mime};base64,${i.data}`}}))]:text;
   const r=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json",...(key?{Authorization:"Bearer "+key}:{})},
-    body:JSON.stringify({model,messages:[{role:"user",content:text}],...(maxTokens?{max_tokens:Math.min(maxTokens,4096)}:{})})});
+    body:JSON.stringify({model,messages:[{role:"user",content}],...(maxTokens?{max_tokens:Math.min(maxTokens,4096)}:{})})});
   const j=await r.json(); if(!r.ok) throw new Error(j.error?.message||r.status);
   return j.choices[0].message.content;
 }
@@ -524,7 +558,16 @@ $("go5").onclick=async()=>{
 };
 // ====== توليد الصور ======
 async function genImage(prompt,w,h){
-  const gk=K("gem"), errs=[];
+  const gk=K("gem"), errs=[], cu=customCfg();
+  if(cu&&cu.img){
+    try{
+      const r=await fetch(cuEndpoint(cu.url,"/images/generations"),{method:"POST",headers:{"Content-Type":"application/json",...(cu.key?{Authorization:"Bearer "+cu.key}:{})},
+        body:JSON.stringify({model:cu.img,prompt,n:1,size:w+"x"+h})});
+      const j=await r.json(); if(!r.ok) throw new Error(j.error?.message||r.status);
+      const d=j.data?.[0]; if(!d) throw new Error("لم يرجع صورة");
+      return {src:d.b64_json?`data:image/png;base64,${d.b64_json}`:d.url,by:"API مخصص · "+cu.img};
+    }catch(e){errs.push("API مخصص: "+e.message)}
+  }
   if((gk||PROXY)&&!window.IMG_SKIP) for(const m of IMG_MODELS){
     try{
       const j=await withKeys(k=>gcall(k,m,{contents:[{role:"user",parts:[{text:prompt}]}],generationConfig:{responseModalities:["TEXT","IMAGE"]}}));
