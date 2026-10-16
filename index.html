@@ -417,12 +417,7 @@ async function webContext(q){
       const j=await r.json(); if(r.ok&&j.results?.length) return j.results.map(x=>({title:x.title,url:x.url,content:(x.content||"").slice(0,1500)}));
     }catch(e){}
   }
-  const l=/[\u0600-\u06FF]/.test(q)?"ar":"en";
-  try{
-    const u=`https://${l}.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(q)}&gsrlimit=5&prop=extracts&exintro=1&explaintext=1&exlimit=5&format=json&origin=*`;
-    const j=await (await fetch(u)).json();
-    return Object.values(j.query?.pages||{}).sort((a,b)=>a.index-b.index).map(p=>({title:p.title,url:`https://${l}.wikipedia.org/wiki/${encodeURIComponent(p.title.replace(/ /g,"_"))}`,content:(p.extract||"").slice(0,2500)}));
-  }catch(e){return []}
+  return []; // لا بحث عام بدون مفتاح: البحث يتم فقط عبر مفتاح Gemini (بحث Google) أو مفتاح Tavily المفعّل
 }
 const DEPTH={
   fast:"أجب بإيجاز مفيد في فقرة أو فقرتين مع أهم الحقائق.",
